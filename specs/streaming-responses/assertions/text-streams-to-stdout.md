@@ -3,7 +3,7 @@ id: text-streams-to-stdout
 parent: streaming-responses
 created: 2026-06-30T00:00:00Z
 priority: 1
-status: not_started
+status: done
 ---
 
 # Text Streams Token-by-Token to Stdout
@@ -11,6 +11,8 @@ status: not_started
 API responses use the streaming endpoint instead of the blocking `Messages.New` call.
 Text content prints to stdout incrementally as delta events arrive — not buffered until
 the response is complete.
+
+**Tests:** agent_test.go
 
 ## Success Criteria
 
