@@ -8,12 +8,16 @@ import (
 	"testing"
 )
 
+func fakeKeyReader(key string) func() (string, error) {
+	return func() (string, error) { return key, nil }
+}
+
 func TestInitCreatesDirectoryStructure(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "my-research")
 
 	var buf bytes.Buffer
-	if err := runInit([]string{target}, &buf); err != nil {
+	if err := runInit([]string{target}, &buf, fakeKeyReader("sk-test")); err != nil {
 		t.Fatalf("runInit failed: %v", err)
 	}
 
@@ -41,45 +45,96 @@ func TestInitCreatesDirectoryStructure(t *testing.T) {
 	if !strings.Contains(output, "Created research directory") {
 		t.Errorf("expected success message, got: %s", output)
 	}
-	if !strings.Contains(output, "--mode backoffice") {
-		t.Errorf("expected next steps in output, got: %s", output)
-	}
 }
 
 func TestInitDefaultsToCurrentDir(t *testing.T) {
 	dir := t.TempDir()
-	// Change to empty temp dir
 	orig, _ := os.Getwd()
 	os.Chdir(dir)
 	defer os.Chdir(orig)
 
 	var buf bytes.Buffer
-	if err := runInit(nil, &buf); err != nil {
+	if err := runInit(nil, &buf, fakeKeyReader("")); err != nil {
 		t.Fatalf("runInit with no args failed: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(dir, "raw")); err != nil {
-		t.Error("expected raw/ in current directory")
-	}
-	if _, err := os.Stat(filepath.Join(dir, "formatted")); err != nil {
-		t.Error("expected formatted/ in current directory")
-	}
-	if _, err := os.Stat(filepath.Join(dir, "doc-template.yaml")); err != nil {
-		t.Error("expected doc-template.yaml in current directory")
+	for _, name := range []string{"raw", "formatted", "doc-template.yaml", ".env"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("expected %s in current directory", name)
+		}
 	}
 }
 
 func TestInitAbortsIfDirectoryHasContent(t *testing.T) {
 	dir := t.TempDir()
-	// Create a file in the target so it's non-empty
 	os.WriteFile(filepath.Join(dir, "existing.txt"), []byte("data"), 0644)
 
 	var buf bytes.Buffer
-	err := runInit([]string{dir}, &buf)
+	err := runInit([]string{dir}, &buf, fakeKeyReader(""))
 	if err == nil {
 		t.Fatal("expected error for non-empty directory")
 	}
 	if !strings.Contains(err.Error(), "already has content") {
 		t.Errorf("expected 'already has content' error, got: %v", err)
+	}
+}
+
+func TestInitPromptsForAPIKey(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "project")
+
+	var buf bytes.Buffer
+	if err := runInit([]string{target}, &buf, fakeKeyReader("sk-ant-my-secret-key")); err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	// Verify prompt was printed
+	output := buf.String()
+	if !strings.Contains(output, "Enter your Anthropic API key:") {
+		t.Errorf("expected API key prompt, got: %s", output)
+	}
+
+	// Verify .env contains the key
+	data, err := os.ReadFile(filepath.Join(target, ".env"))
+	if err != nil {
+		t.Fatalf("expected .env to exist: %v", err)
+	}
+	if !strings.Contains(string(data), "ANTHROPIC_API_KEY=sk-ant-my-secret-key") {
+		t.Errorf("expected API key in .env, got: %s", string(data))
+	}
+
+	// Verify output says "Next: run:" (not asking to set key)
+	if !strings.Contains(output, "Next: run:") {
+		t.Errorf("expected 'Next: run:' in output, got: %s", output)
+	}
+}
+
+func TestInitSkippedKeyWritesPlaceholder(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "project")
+
+	var buf bytes.Buffer
+	if err := runInit([]string{target}, &buf, fakeKeyReader("")); err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(target, ".env"))
+	if err != nil {
+		t.Fatalf("expected .env to exist: %v", err)
+	}
+	content := string(data)
+
+	// Should have placeholder comment, not a real key
+	if !strings.Contains(content, "console.anthropic.com") {
+		t.Errorf("expected placeholder with console URL, got: %s", content)
+	}
+	if strings.Contains(content, "ANTHROPIC_API_KEY=sk-") {
+		t.Errorf("should not have a real key, got: %s", content)
+	}
+
+	// Output should tell user to add key
+	output := buf.String()
+	if !strings.Contains(output, "add your ANTHROPIC_API_KEY") {
+		t.Errorf("expected instruction to add key, got: %s", output)
 	}
 }

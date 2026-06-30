@@ -10,6 +10,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"golang.org/x/term"
 )
 
 func loadEnv() {
@@ -39,7 +40,11 @@ func loadEnv() {
 func main() {
 	// Handle "init" subcommand before flag parsing
 	if len(os.Args) >= 2 && os.Args[1] == "init" {
-		if err := runInit(os.Args[2:], os.Stdout); err != nil {
+		readKey := func() (string, error) {
+			b, err := term.ReadPassword(int(os.Stdin.Fd()))
+			return string(b), err
+		}
+		if err := runInit(os.Args[2:], os.Stdout, readKey); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
