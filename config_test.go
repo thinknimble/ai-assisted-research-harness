@@ -65,6 +65,80 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	}
 }
 
+func TestRegisterRepo_DerivesNameFromPath(t *testing.T) {
+	cfg := &GlobalConfig{Repos: map[string]string{}}
+
+	name := RegisterRepo(cfg, "/home/user/work/ai-papers")
+
+	if name != "ai-papers" {
+		t.Errorf("got name %q, want %q", name, "ai-papers")
+	}
+	if cfg.Repos["ai-papers"] != "/home/user/work/ai-papers" {
+		t.Errorf("repo path not registered correctly")
+	}
+}
+
+func TestRegisterRepo_FirstRepoBecomeDefault(t *testing.T) {
+	cfg := &GlobalConfig{Repos: map[string]string{}}
+
+	name := RegisterRepo(cfg, "/home/user/work/ai-papers")
+
+	if cfg.Default != name {
+		t.Errorf("first repo should be default, got default=%q", cfg.Default)
+	}
+}
+
+func TestRegisterRepo_SecondRepoDoesNotOverrideDefault(t *testing.T) {
+	cfg := &GlobalConfig{
+		Repos:   map[string]string{"first": "/some/path"},
+		Default: "first",
+	}
+
+	RegisterRepo(cfg, "/home/user/work/second-project")
+
+	if cfg.Default != "first" {
+		t.Errorf("default should remain %q, got %q", "first", cfg.Default)
+	}
+}
+
+func TestRegisterRepo_DuplicateNameGetsSuffix(t *testing.T) {
+	cfg := &GlobalConfig{
+		Repos: map[string]string{
+			"ai-papers": "/old/path/ai-papers",
+		},
+		Default: "ai-papers",
+	}
+
+	name := RegisterRepo(cfg, "/new/path/ai-papers")
+
+	if name != "ai-papers-2" {
+		t.Errorf("got name %q, want %q", name, "ai-papers-2")
+	}
+	// Original should be untouched
+	if cfg.Repos["ai-papers"] != "/old/path/ai-papers" {
+		t.Errorf("original repo was overwritten")
+	}
+	if cfg.Repos["ai-papers-2"] != "/new/path/ai-papers" {
+		t.Errorf("new repo not registered at suffixed name")
+	}
+}
+
+func TestRegisterRepo_MultipleDuplicatesIncrementSuffix(t *testing.T) {
+	cfg := &GlobalConfig{
+		Repos: map[string]string{
+			"project":   "/path/1/project",
+			"project-2": "/path/2/project",
+		},
+		Default: "project",
+	}
+
+	name := RegisterRepo(cfg, "/path/3/project")
+
+	if name != "project-3" {
+		t.Errorf("got name %q, want %q", name, "project-3")
+	}
+}
+
 func TestConfigDir_IsUnderHome(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)

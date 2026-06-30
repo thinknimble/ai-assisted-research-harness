@@ -66,11 +66,22 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error)) er
 		}
 	}
 
+	// Register repo in global config
+	cfg, err := LoadGlobalConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load global config: %w", err)
+	}
+	repoName := RegisterRepo(cfg, absTarget)
+	if err := SaveGlobalConfig(cfg); err != nil {
+		return fmt.Errorf("failed to save global config: %w", err)
+	}
+
 	fmt.Fprintf(stdout, "Created research directory at %s\n", absTarget)
 	fmt.Fprintln(stdout, "  raw/")
 	fmt.Fprintln(stdout, "  formatted/")
 	fmt.Fprintln(stdout, "  doc-template.yaml")
 	fmt.Fprintln(stdout, "  .env")
+	fmt.Fprintf(stdout, "  registered as %q in global config\n", repoName)
 	fmt.Fprintln(stdout, "")
 	if apiKey == "" {
 		fmt.Fprintln(stdout, "Next: add your ANTHROPIC_API_KEY to .env, then run:")

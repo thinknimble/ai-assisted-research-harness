@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -51,6 +52,34 @@ func LoadGlobalConfig() (*GlobalConfig, error) {
 		cfg.Repos = map[string]string{}
 	}
 	return &cfg, nil
+}
+
+// RegisterRepo adds a repo to the global config with a name derived from the
+// directory basename. If it's the first repo, it becomes the default. If a repo
+// with the same name already exists, a numeric suffix is appended.
+func RegisterRepo(cfg *GlobalConfig, absPath string) string {
+	base := filepath.Base(absPath)
+	name := base
+
+	// If name already taken, append -2, -3, etc.
+	if _, exists := cfg.Repos[name]; exists {
+		for i := 2; ; i++ {
+			candidate := fmt.Sprintf("%s-%d", base, i)
+			if _, exists := cfg.Repos[candidate]; !exists {
+				name = candidate
+				break
+			}
+		}
+	}
+
+	cfg.Repos[name] = absPath
+
+	// First registered repo becomes the default
+	if len(cfg.Repos) == 1 {
+		cfg.Default = name
+	}
+
+	return name
 }
 
 // SaveGlobalConfig writes the config to disk, creating the directory if needed.

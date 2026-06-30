@@ -3,7 +3,7 @@ id: init-registers-repo
 parent: multi-repo-config
 created: 2026-06-30T00:00:00Z
 priority: 1
-status: not_started
+status: done
 depends-on: global-config-file
 ---
 

@@ -109,6 +109,37 @@ func TestInitPromptsForAPIKey(t *testing.T) {
 	}
 }
 
+func TestInitRegistersRepoInGlobalConfig(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	target := filepath.Join(tmp, "ai-papers")
+
+	var buf bytes.Buffer
+	if err := runInit([]string{target}, &buf, fakeKeyReader("sk-test")); err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	cfg, err := LoadGlobalConfig()
+	if err != nil {
+		t.Fatalf("LoadGlobalConfig: %v", err)
+	}
+
+	// Should be registered with name derived from directory
+	if cfg.Repos["ai-papers"] != target {
+		t.Errorf("repo not registered: repos=%v", cfg.Repos)
+	}
+
+	// First repo should be the default
+	if cfg.Default != "ai-papers" {
+		t.Errorf("expected default %q, got %q", "ai-papers", cfg.Default)
+	}
+
+	// Output should mention registration
+	if !strings.Contains(buf.String(), `registered as "ai-papers"`) {
+		t.Errorf("expected registration message in output, got: %s", buf.String())
+	}
+}
+
 func TestInitSkippedKeyWritesPlaceholder(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "project")
