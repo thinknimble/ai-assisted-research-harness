@@ -3,7 +3,8 @@ id: init-creates-directory-structure
 parent: scaffold-init
 created: 2026-06-30T00:00:00Z
 priority: 1
-status: not_started
+status: in_progress
+locked-by: builder-Paris-MacBook-Pro-2-96082-1782850453
 ---
 
 # Init Creates Directory Structure
