@@ -3,8 +3,7 @@ id: docs-deploy-on-release
 parent: ci-release-pipeline
 created: 2026-06-30T00:00:00Z
 priority: 2
-status: in_progress
-locked-by: builder-Paris-MacBook-Pro-2.local-67349-1782851453
+status: done
 depends-on: release-workflow-on-tag
 ---
 
