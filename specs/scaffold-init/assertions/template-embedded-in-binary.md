@@ -3,7 +3,7 @@ id: template-embedded-in-binary
 parent: scaffold-init
 created: 2026-06-30T00:00:00Z
 priority: 1
-status: not_started
+status: done
 ---
 
 # Doc Template Is Embedded in the Binary
