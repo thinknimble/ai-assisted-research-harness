@@ -38,7 +38,15 @@ func loadEnv() {
 }
 
 func main() {
-	// Handle "init" subcommand before flag parsing
+	// Handle subcommands before flag parsing
+	if len(os.Args) >= 2 && os.Args[1] == "repos" {
+		if err := runRepos(os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if len(os.Args) >= 2 && os.Args[1] == "init" {
 		readKey := func() (string, error) {
 			b, err := term.ReadPassword(int(os.Stdin.Fd()))

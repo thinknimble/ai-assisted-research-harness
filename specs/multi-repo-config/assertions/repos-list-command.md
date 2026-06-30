@@ -3,7 +3,7 @@ id: repos-list-command
 parent: multi-repo-config
 created: 2026-06-30T00:00:00Z
 priority: 2
-status: not_started
+status: done
 depends-on: global-config-file
 ---
 
@@ -16,3 +16,5 @@ Users can see all their registered research directories and which one is the def
 - `research-assistant repos` prints all registered repos with name, path, and
   a marker indicating which is the default
 - If no repos are registered, prints a message suggesting `research-assistant init`
+
+**Tests:** repos_test.go
