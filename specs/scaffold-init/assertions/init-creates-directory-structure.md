@@ -3,7 +3,7 @@ id: init-creates-directory-structure
 parent: scaffold-init
 created: 2026-06-30T00:00:00Z
 priority: 1
-status: in_progress
+status: not_started
 ---
 
 # Init Creates Directory Structure
