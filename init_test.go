@@ -65,17 +65,29 @@ func TestInitDefaultsToCurrentDir(t *testing.T) {
 	}
 }
 
-func TestInitAbortsIfDirectoryHasContent(t *testing.T) {
+func TestInitAbortsIfDirectoryHasNonResearchContent(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "existing.txt"), []byte("data"), 0644)
 
 	var buf bytes.Buffer
 	err := runInit([]string{dir}, &buf, fakeKeyReader(""))
 	if err == nil {
-		t.Fatal("expected error for non-empty directory")
+		t.Fatal("expected error for non-research directory with content")
 	}
-	if !strings.Contains(err.Error(), "already has content") {
-		t.Errorf("expected 'already has content' error, got: %v", err)
+	if !strings.Contains(err.Error(), "not a research directory") {
+		t.Errorf("expected 'not a research directory' error, got: %v", err)
+	}
+}
+
+func TestInitAllowsExistingResearchDirectory(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "raw"), 0755)
+	os.MkdirAll(filepath.Join(dir, "formatted"), 0755)
+
+	var buf bytes.Buffer
+	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"))
+	if err != nil {
+		t.Fatalf("expected init to succeed for existing research directory, got: %v", err)
 	}
 }
 

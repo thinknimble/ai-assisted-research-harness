@@ -26,7 +26,20 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error)) er
 	// Check if directory exists and has content
 	entries, err := os.ReadDir(absTarget)
 	if err == nil && len(entries) > 0 {
-		return fmt.Errorf("directory %s already has content — aborting to avoid overwriting", absTarget)
+		// Allow existing research directories (contain raw/ or formatted/)
+		hasRaw := false
+		hasFormatted := false
+		for _, e := range entries {
+			if e.IsDir() && e.Name() == "raw" {
+				hasRaw = true
+			}
+			if e.IsDir() && e.Name() == "formatted" {
+				hasFormatted = true
+			}
+		}
+		if !hasRaw && !hasFormatted {
+			return fmt.Errorf("directory %s already has content that is not a research directory — aborting to avoid overwriting", absTarget)
+		}
 	}
 
 	// Create directory structure
