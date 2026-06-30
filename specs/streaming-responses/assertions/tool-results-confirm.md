@@ -3,11 +3,13 @@ id: tool-results-confirm
 parent: streaming-responses
 created: 2026-06-30T00:00:00Z
 priority: 1
-status: not_started
+status: done
 depends-on: tool-calls-print-status
 ---
 
 # Tool Results Print Confirmation Before Resuming
+
+**Tests:** agent_test.go
 
 After a tool finishes executing, a brief confirmation prints to stderr before the
 next API call resumes streaming. This closes the feedback loop — the user sees

@@ -228,6 +228,165 @@ func TestToolCallPrintsStatusToStderr(t *testing.T) {
 	}
 }
 
+func TestToolResultPrintsConfirmationToStderr(t *testing.T) {
+	toolInput := json.RawMessage(`{"path":"raw/doc.md"}`)
+	callCount := 0
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(200)
+		callCount++
+		if callCount == 1 {
+			w.Write(sseToolUseResponse("read_file", "toolu_01", toolInput))
+		} else {
+			w.Write(sseResponse([]string{"OK"}))
+		}
+	}))
+	defer server.Close()
+
+	client := anthropic.NewClient(
+		option.WithAPIKey("test-key"),
+		option.WithBaseURL(server.URL),
+	)
+
+	oldStderr := os.Stderr
+	stderrR, stderrW, _ := os.Pipe()
+	os.Stderr = stderrW
+
+	oldStdout := os.Stdout
+	_, stdoutW, _ := os.Pipe()
+	os.Stdout = stdoutW
+
+	setup := ModeSetup{
+		SystemPrompt: "test",
+		Tools: []anthropic.ToolUnionParam{
+			{OfTool: &anthropic.ToolParam{
+				Name:        "read_file",
+				Description: anthropic.String("Read a file"),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: map[string]any{
+						"path": map[string]any{"type": "string"},
+					},
+				},
+			}},
+		},
+		HandleTool: func(name string, input json.RawMessage) (string, error) {
+			return "file contents", nil
+		},
+	}
+	messages := []anthropic.MessageParam{
+		{
+			Role: anthropic.MessageParamRoleUser,
+			Content: []anthropic.ContentBlockParamUnion{
+				{OfText: &anthropic.TextBlockParam{Text: "read it"}},
+			},
+		},
+	}
+
+	_, err := runToolLoop(client, "claude-sonnet-4-6-20250514", setup, &messages)
+
+	stderrW.Close()
+	stdoutW.Close()
+	os.Stderr = oldStderr
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var stderrBuf bytes.Buffer
+	stderrBuf.ReadFrom(stderrR)
+	stderrOutput := stderrBuf.String()
+
+	// Must contain the status line AND a done confirmation
+	if !strings.Contains(stderrOutput, "[done]") {
+		t.Errorf("stderr should contain '[done]' confirmation, got: %q", stderrOutput)
+	}
+
+	// Verify ordering: status line comes before done
+	statusIdx := strings.Index(stderrOutput, "[using read_file")
+	doneIdx := strings.Index(stderrOutput, "[done]")
+	if statusIdx >= doneIdx {
+		t.Errorf("status line should appear before done confirmation, got: %q", stderrOutput)
+	}
+}
+
+func TestToolResultErrorPrintsErrorToStderr(t *testing.T) {
+	toolInput := json.RawMessage(`{"path":"missing.md"}`)
+	callCount := 0
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(200)
+		callCount++
+		if callCount == 1 {
+			w.Write(sseToolUseResponse("read_file", "toolu_01", toolInput))
+		} else {
+			w.Write(sseResponse([]string{"Sorry."}))
+		}
+	}))
+	defer server.Close()
+
+	client := anthropic.NewClient(
+		option.WithAPIKey("test-key"),
+		option.WithBaseURL(server.URL),
+	)
+
+	oldStderr := os.Stderr
+	stderrR, stderrW, _ := os.Pipe()
+	os.Stderr = stderrW
+
+	oldStdout := os.Stdout
+	_, stdoutW, _ := os.Pipe()
+	os.Stdout = stdoutW
+
+	setup := ModeSetup{
+		SystemPrompt: "test",
+		Tools: []anthropic.ToolUnionParam{
+			{OfTool: &anthropic.ToolParam{
+				Name:        "read_file",
+				Description: anthropic.String("Read a file"),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: map[string]any{
+						"path": map[string]any{"type": "string"},
+					},
+				},
+			}},
+		},
+		HandleTool: func(name string, input json.RawMessage) (string, error) {
+			return "", fmt.Errorf("file not found")
+		},
+	}
+	messages := []anthropic.MessageParam{
+		{
+			Role: anthropic.MessageParamRoleUser,
+			Content: []anthropic.ContentBlockParamUnion{
+				{OfText: &anthropic.TextBlockParam{Text: "read it"}},
+			},
+		},
+	}
+
+	_, err := runToolLoop(client, "claude-sonnet-4-6-20250514", setup, &messages)
+
+	stderrW.Close()
+	stdoutW.Close()
+	os.Stderr = oldStderr
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var stderrBuf bytes.Buffer
+	stderrBuf.ReadFrom(stderrR)
+	stderrOutput := stderrBuf.String()
+
+	// Must contain an error confirmation
+	if !strings.Contains(stderrOutput, "[error: file not found]") {
+		t.Errorf("stderr should contain '[error: file not found]', got: %q", stderrOutput)
+	}
+}
+
 func TestToolStatusLabel(t *testing.T) {
 	tests := []struct {
 		name     string

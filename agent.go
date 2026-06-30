@@ -98,6 +98,7 @@ func runToolLoop(client anthropic.Client, model string, setup ModeSetup, message
 			result, toolErr := setup.HandleTool(tu.Name, tu.Input)
 
 			if toolErr != nil {
+				fmt.Fprintf(os.Stderr, "[error: %s]\n", toolErr.Error())
 				toolResults = append(toolResults, anthropic.ContentBlockParamUnion{
 					OfToolResult: &anthropic.ToolResultBlockParam{
 						ToolUseID: tu.ID,
@@ -108,6 +109,7 @@ func runToolLoop(client anthropic.Client, model string, setup ModeSetup, message
 					},
 				})
 			} else {
+				fmt.Fprintf(os.Stderr, "[done]\n")
 				toolResults = append(toolResults, anthropic.ContentBlockParamUnion{
 					OfToolResult: &anthropic.ToolResultBlockParam{
 						ToolUseID: tu.ID,
