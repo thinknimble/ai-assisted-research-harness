@@ -3,9 +3,8 @@ id: release-workflow-on-tag
 parent: ci-release-pipeline
 created: 2026-06-30T00:00:00Z
 priority: 1
-status: in_progress
+status: done
 depends-on: test-workflow-on-push
-locked-by: builder-Paris-MacBook-Pro-2-52715-1751270400
 ---
 
 # Release Workflow Builds Cross-Platform Binaries on Tag

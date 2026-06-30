@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - run: go build .
+
+      - run: go test ./... -count=1 -timeout 120s
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Set version
+        run: echo "VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+
+      - name: Build cross-platform binaries
+        run: |
+          mkdir -p dist
+
+          GOOS=linux   GOARCH=amd64 go build -ldflags "-X main.version=$VERSION" -o dist/research-assistant-linux-amd64   .
+          GOOS=linux   GOARCH=arm64 go build -ldflags "-X main.version=$VERSION" -o dist/research-assistant-linux-arm64   .
+          GOOS=darwin  GOARCH=amd64 go build -ldflags "-X main.version=$VERSION" -o dist/research-assistant-darwin-amd64  .
+          GOOS=darwin  GOARCH=arm64 go build -ldflags "-X main.version=$VERSION" -o dist/research-assistant-darwin-arm64  .
+          GOOS=windows GOARCH=amd64 go build -ldflags "-X main.version=$VERSION" -o dist/research-assistant-windows-amd64.exe .
+          GOOS=windows GOARCH=arm64 go build -ldflags "-X main.version=$VERSION" -o dist/research-assistant-windows-arm64.exe .
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          generate_release_notes: true
