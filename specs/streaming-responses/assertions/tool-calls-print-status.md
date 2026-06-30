@@ -3,11 +3,13 @@ id: tool-calls-print-status
 parent: streaming-responses
 created: 2026-06-30T00:00:00Z
 priority: 1
-status: not_started
+status: done
 depends-on: text-streams-to-stdout
 ---
 
 # Tool Invocations Print a Status Line
+
+**Tests:** agent_test.go
 
 When the agent invokes a tool, a visible status line prints to stderr so the user
 knows what's happening. This covers the gap between "agent decided to use a tool"

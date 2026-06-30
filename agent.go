@@ -52,6 +52,23 @@ func sendMessageStreaming(client anthropic.Client, model string, setup ModeSetup
 	return &message, nil
 }
 
+// toolStatusLabel returns a human-readable label for a tool invocation.
+// It always includes the tool name; for tools with a short, useful input
+// (e.g. a file path or search query) it appends that context.
+func toolStatusLabel(name string, input json.RawMessage) string {
+	var params map[string]any
+	if err := json.Unmarshal(input, &params); err == nil {
+		for _, key := range []string{"path", "filename", "query"} {
+			if v, ok := params[key]; ok {
+				if s, ok := v.(string); ok && len(s) <= 120 {
+					return fmt.Sprintf("using %s: %s...", name, s)
+				}
+			}
+		}
+	}
+	return fmt.Sprintf("using %s...", name)
+}
+
 func runToolLoop(client anthropic.Client, model string, setup ModeSetup, messages *[]anthropic.MessageParam) (string, error) {
 	for {
 		resp, err := sendMessageStreaming(client, model, setup, *messages)
@@ -77,6 +94,7 @@ func runToolLoop(client anthropic.Client, model string, setup ModeSetup, message
 				continue
 			}
 			tu := block.AsToolUse()
+			fmt.Fprintf(os.Stderr, "[%s]\n", toolStatusLabel(tu.Name, tu.Input))
 			result, toolErr := setup.HandleTool(tu.Name, tu.Input)
 
 			if toolErr != nil {
