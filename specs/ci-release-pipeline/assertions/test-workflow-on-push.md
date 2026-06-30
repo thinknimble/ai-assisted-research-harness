@@ -3,7 +3,8 @@ id: test-workflow-on-push
 parent: ci-release-pipeline
 created: 2026-06-30T00:00:00Z
 priority: 1
-status: not_started
+status: in_progress
+locked-by: builder-Paris-MacBook-Pro-2.local-40701-1782851020
 ---
 
 # Test Workflow Runs on Every Push
