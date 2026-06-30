@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -136,6 +137,95 @@ func TestRegisterRepo_MultipleDuplicatesIncrementSuffix(t *testing.T) {
 
 	if name != "project-3" {
 		t.Errorf("got name %q, want %q", name, "project-3")
+	}
+}
+
+func TestResolveProjectRoot_RepoFlagSelectsRegisteredRepo(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	cfg := &GlobalConfig{
+		Repos: map[string]string{
+			"ai-papers": "/home/user/research/ai-papers",
+			"ml-notes":  "/home/user/research/ml-notes",
+		},
+		Default: "ml-notes",
+	}
+	if err := SaveGlobalConfig(cfg); err != nil {
+		t.Fatalf("SaveGlobalConfig: %v", err)
+	}
+
+	root, err := ResolveProjectRoot("ai-papers")
+	if err != nil {
+		t.Fatalf("ResolveProjectRoot: %v", err)
+	}
+	if root != "/home/user/research/ai-papers" {
+		t.Errorf("got %q, want %q", root, "/home/user/research/ai-papers")
+	}
+}
+
+func TestResolveProjectRoot_NoFlagUsesDefault(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	cfg := &GlobalConfig{
+		Repos: map[string]string{
+			"ai-papers": "/home/user/research/ai-papers",
+			"ml-notes":  "/home/user/research/ml-notes",
+		},
+		Default: "ml-notes",
+	}
+	if err := SaveGlobalConfig(cfg); err != nil {
+		t.Fatalf("SaveGlobalConfig: %v", err)
+	}
+
+	root, err := ResolveProjectRoot("")
+	if err != nil {
+		t.Fatalf("ResolveProjectRoot: %v", err)
+	}
+	if root != "/home/user/research/ml-notes" {
+		t.Errorf("got %q, want %q", root, "/home/user/research/ml-notes")
+	}
+}
+
+func TestResolveProjectRoot_NoConfigFallsToCwd(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	// No config file exists — should fall back to cwd
+
+	cwd, _ := os.Getwd()
+	root, err := ResolveProjectRoot("")
+	if err != nil {
+		t.Fatalf("ResolveProjectRoot: %v", err)
+	}
+	if root != cwd {
+		t.Errorf("got %q, want cwd %q", root, cwd)
+	}
+}
+
+func TestResolveProjectRoot_UnknownRepoErrors(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	cfg := &GlobalConfig{
+		Repos: map[string]string{
+			"ai-papers": "/home/user/research/ai-papers",
+		},
+		Default: "ai-papers",
+	}
+	if err := SaveGlobalConfig(cfg); err != nil {
+		t.Fatalf("SaveGlobalConfig: %v", err)
+	}
+
+	_, err := ResolveProjectRoot("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for unknown repo, got nil")
+	}
+	if !strings.Contains(err.Error(), "nonexistent") {
+		t.Errorf("error should mention the unknown name: %v", err)
+	}
+	if !strings.Contains(err.Error(), "ai-papers") {
+		t.Errorf("error should list available repos: %v", err)
 	}
 }
 

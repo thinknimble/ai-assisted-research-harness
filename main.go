@@ -51,16 +51,24 @@ func main() {
 		return
 	}
 
-	loadEnv()
-
 	mode := flag.String("mode", "", "Mode: 'backoffice' or 'reception'")
 	model := flag.String("model", string(anthropic.ModelClaudeSonnet4_6), "Claude model to use")
+	repo := flag.String("repo", "", "Target repo name from config")
 	flag.Parse()
 
 	if *mode != "backoffice" && *mode != "reception" {
 		fmt.Fprintln(os.Stderr, "Usage: research-assistant --mode <backoffice|reception>")
 		os.Exit(1)
 	}
+
+	root, err := ResolveProjectRoot(*repo)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	projectRoot = root
+
+	loadEnv()
 
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" {

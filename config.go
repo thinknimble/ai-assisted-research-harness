@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.yaml.in/yaml/v4"
 )
@@ -80,6 +81,82 @@ func RegisterRepo(cfg *GlobalConfig, absPath string) string {
 	}
 
 	return name
+}
+
+// ResolveProjectRoot determines the project root directory based on the --repo
+// flag and the global config. Precedence:
+//  1. If repoFlag is set, look it up in config (error if not found)
+//  2. If no flag, use the default repo from config
+//  3. If no config file exists or no default is set, fall back to cwd
+func ResolveProjectRoot(repoFlag string) (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	cfg, err := loadGlobalConfigIfExists()
+	if err != nil {
+		return "", err
+	}
+
+	// No config file exists at all
+	if cfg == nil {
+		if repoFlag != "" {
+			return "", fmt.Errorf("no config file found; cannot resolve --repo %q", repoFlag)
+		}
+		return cwd, nil
+	}
+
+	// --repo flag was provided: look it up
+	if repoFlag != "" {
+		path, ok := cfg.Repos[repoFlag]
+		if !ok {
+			return "", fmt.Errorf("unknown repo %q; available repos: %s", repoFlag, availableRepoNames(cfg))
+		}
+		return path, nil
+	}
+
+	// No flag: use default if set
+	if cfg.Default != "" {
+		if path, ok := cfg.Repos[cfg.Default]; ok {
+			return path, nil
+		}
+	}
+
+	// No default or default not found in repos: fall back to cwd
+	return cwd, nil
+}
+
+// loadGlobalConfigIfExists reads the config file without creating it.
+// Returns nil, nil if the file does not exist.
+func loadGlobalConfigIfExists() (*GlobalConfig, error) {
+	data, err := os.ReadFile(configPath())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var cfg GlobalConfig
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+	if cfg.Repos == nil {
+		cfg.Repos = map[string]string{}
+	}
+	return &cfg, nil
+}
+
+func availableRepoNames(cfg *GlobalConfig) string {
+	if len(cfg.Repos) == 0 {
+		return "(none)"
+	}
+	names := make([]string, 0, len(cfg.Repos))
+	for name := range cfg.Repos {
+		names = append(names, name)
+	}
+	return strings.Join(names, ", ")
 }
 
 // SaveGlobalConfig writes the config to disk, creating the directory if needed.
