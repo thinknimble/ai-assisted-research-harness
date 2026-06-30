@@ -37,6 +37,15 @@ func loadEnv() {
 }
 
 func main() {
+	// Handle "init" subcommand before flag parsing
+	if len(os.Args) >= 2 && os.Args[1] == "init" {
+		if err := runInit(os.Args[2:], os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	loadEnv()
 
 	mode := flag.String("mode", "", "Mode: 'backoffice' or 'reception'")
