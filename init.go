@@ -24,9 +24,9 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error)) er
 	}
 
 	// Check if directory exists and has content
+	existingResearchDir := false
 	entries, err := os.ReadDir(absTarget)
 	if err == nil && len(entries) > 0 {
-		// Allow existing research directories (contain raw/ or formatted/)
 		hasRaw := false
 		hasFormatted := false
 		for _, e := range entries {
@@ -37,45 +37,54 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error)) er
 				hasFormatted = true
 			}
 		}
-		if !hasRaw && !hasFormatted {
+		if hasRaw && hasFormatted {
+			existingResearchDir = true
+		} else {
 			return fmt.Errorf("directory %s already has content that is not a research directory — aborting to avoid overwriting", absTarget)
 		}
 	}
 
-	// Create directory structure
-	if err := os.MkdirAll(filepath.Join(absTarget, "raw"), 0755); err != nil {
-		return fmt.Errorf("failed to create raw/: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Join(absTarget, "formatted"), 0755); err != nil {
-		return fmt.Errorf("failed to create formatted/: %w", err)
-	}
-
-	// Write doc-template.yaml
-	templatePath := filepath.Join(absTarget, "doc-template.yaml")
-	if err := os.WriteFile(templatePath, []byte(embeddedDocTemplate), 0644); err != nil {
-		return fmt.Errorf("failed to write doc-template.yaml: %w", err)
-	}
-
-	// Prompt for API key
-	fmt.Fprint(stdout, "Enter your Anthropic API key: ")
-	apiKey, err := readKey()
-	if err != nil {
-		return fmt.Errorf("failed to read API key: %w", err)
-	}
-	fmt.Fprintln(stdout) // newline after masked input
-
-	apiKey = strings.TrimSpace(apiKey)
-	envPath := filepath.Join(absTarget, ".env")
-
-	if apiKey == "" {
-		placeholder := "# Get your API key at https://console.anthropic.com/settings/keys\n# Uncomment the line below and paste your key:\n# ANTHROPIC_API_KEY=your-key-here\n"
-		if err := os.WriteFile(envPath, []byte(placeholder), 0644); err != nil {
-			return fmt.Errorf("failed to write .env: %w", err)
+	if !existingResearchDir {
+		// Create directory structure from scratch
+		if err := os.MkdirAll(filepath.Join(absTarget, "raw"), 0755); err != nil {
+			return fmt.Errorf("failed to create raw/: %w", err)
 		}
-	} else {
-		content := "ANTHROPIC_API_KEY=" + apiKey + "\n"
-		if err := os.WriteFile(envPath, []byte(content), 0644); err != nil {
-			return fmt.Errorf("failed to write .env: %w", err)
+		if err := os.MkdirAll(filepath.Join(absTarget, "formatted"), 0755); err != nil {
+			return fmt.Errorf("failed to create formatted/: %w", err)
+		}
+	}
+
+	// Write doc-template.yaml only if it doesn't already exist
+	templatePath := filepath.Join(absTarget, "doc-template.yaml")
+	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+		if err := os.WriteFile(templatePath, []byte(embeddedDocTemplate), 0644); err != nil {
+			return fmt.Errorf("failed to write doc-template.yaml: %w", err)
+		}
+	}
+
+	// Handle .env only if it doesn't already exist
+	envPath := filepath.Join(absTarget, ".env")
+	apiKey := ""
+	if _, err := os.Stat(envPath); os.IsNotExist(err) {
+		fmt.Fprint(stdout, "Enter your Anthropic API key: ")
+		key, err := readKey()
+		if err != nil {
+			return fmt.Errorf("failed to read API key: %w", err)
+		}
+		fmt.Fprintln(stdout) // newline after masked input
+
+		apiKey = strings.TrimSpace(key)
+
+		if apiKey == "" {
+			placeholder := "# Get your API key at https://console.anthropic.com/settings/keys\n# Uncomment the line below and paste your key:\n# ANTHROPIC_API_KEY=your-key-here\n"
+			if err := os.WriteFile(envPath, []byte(placeholder), 0644); err != nil {
+				return fmt.Errorf("failed to write .env: %w", err)
+			}
+		} else {
+			content := "ANTHROPIC_API_KEY=" + apiKey + "\n"
+			if err := os.WriteFile(envPath, []byte(content), 0644); err != nil {
+				return fmt.Errorf("failed to write .env: %w", err)
+			}
 		}
 	}
 
@@ -89,19 +98,23 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error)) er
 		return fmt.Errorf("failed to save global config: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "Created research directory at %s\n", absTarget)
-	fmt.Fprintln(stdout, "  raw/")
-	fmt.Fprintln(stdout, "  formatted/")
-	fmt.Fprintln(stdout, "  doc-template.yaml")
-	fmt.Fprintln(stdout, "  .env")
-	fmt.Fprintf(stdout, "  registered as %q in global config\n", repoName)
-	fmt.Fprintln(stdout, "")
-	if apiKey == "" {
-		fmt.Fprintln(stdout, "Next: add your ANTHROPIC_API_KEY to .env, then run:")
+	if existingResearchDir {
+		fmt.Fprintf(stdout, "Found existing research directory, registered as %q\n", repoName)
 	} else {
-		fmt.Fprintln(stdout, "Next: run:")
+		fmt.Fprintf(stdout, "Created research directory at %s\n", absTarget)
+		fmt.Fprintln(stdout, "  raw/")
+		fmt.Fprintln(stdout, "  formatted/")
+		fmt.Fprintln(stdout, "  doc-template.yaml")
+		fmt.Fprintln(stdout, "  .env")
+		fmt.Fprintf(stdout, "  registered as %q in global config\n", repoName)
+		fmt.Fprintln(stdout, "")
+		if apiKey == "" {
+			fmt.Fprintln(stdout, "Next: add your ANTHROPIC_API_KEY to .env, then run:")
+		} else {
+			fmt.Fprintln(stdout, "Next: run:")
+		}
+		fmt.Fprintf(stdout, "  research-assistant --mode backoffice\n")
 	}
-	fmt.Fprintf(stdout, "  research-assistant --mode backoffice\n")
 
 	return nil
 }

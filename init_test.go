@@ -91,6 +91,114 @@ func TestInitAllowsExistingResearchDirectory(t *testing.T) {
 	}
 }
 
+func TestInitExistingResearchDirRegistersAndPrintsMessage(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	dir := filepath.Join(tmp, "my-papers")
+	os.MkdirAll(filepath.Join(dir, "raw"), 0755)
+	os.MkdirAll(filepath.Join(dir, "formatted"), 0755)
+
+	var buf bytes.Buffer
+	err := runInit([]string{dir}, &buf, fakeKeyReader(""))
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	output := buf.String()
+
+	// Should print the registration message
+	if !strings.Contains(output, "Found existing research directory") {
+		t.Errorf("expected 'Found existing research directory' message, got: %s", output)
+	}
+	if !strings.Contains(output, `registered as "my-papers"`) {
+		t.Errorf("expected registration name in message, got: %s", output)
+	}
+
+	// Should NOT print "Created research directory"
+	if strings.Contains(output, "Created research directory") {
+		t.Errorf("should not say 'Created' for existing directory, got: %s", output)
+	}
+
+	// Should be registered in global config
+	cfg, err := LoadGlobalConfig()
+	if err != nil {
+		t.Fatalf("LoadGlobalConfig: %v", err)
+	}
+	absDir, _ := filepath.Abs(dir)
+	if cfg.Repos["my-papers"] != absDir {
+		t.Errorf("repo not registered: repos=%v", cfg.Repos)
+	}
+}
+
+func TestInitExistingDirFillsMissingTemplate(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	os.MkdirAll(filepath.Join(dir, "raw"), 0755)
+	os.MkdirAll(filepath.Join(dir, "formatted"), 0755)
+	// No doc-template.yaml exists
+
+	var buf bytes.Buffer
+	if err := runInit([]string{dir}, &buf, fakeKeyReader("")); err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	// doc-template.yaml should be created
+	data, err := os.ReadFile(filepath.Join(dir, "doc-template.yaml"))
+	if err != nil {
+		t.Fatalf("expected doc-template.yaml to be created: %v", err)
+	}
+	if len(data) == 0 {
+		t.Error("doc-template.yaml should have content")
+	}
+}
+
+func TestInitExistingDirNeverOverwritesFiles(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	os.MkdirAll(filepath.Join(dir, "raw"), 0755)
+	os.MkdirAll(filepath.Join(dir, "formatted"), 0755)
+
+	// Pre-existing doc-template.yaml with custom content
+	customTemplate := "my-custom-template-content"
+	os.WriteFile(filepath.Join(dir, "doc-template.yaml"), []byte(customTemplate), 0644)
+	// Pre-existing .env with custom content
+	customEnv := "MY_CUSTOM_VAR=hello"
+	os.WriteFile(filepath.Join(dir, ".env"), []byte(customEnv), 0644)
+
+	var buf bytes.Buffer
+	if err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test")); err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	// doc-template.yaml should NOT be overwritten
+	data, _ := os.ReadFile(filepath.Join(dir, "doc-template.yaml"))
+	if string(data) != customTemplate {
+		t.Errorf("doc-template.yaml was overwritten, got: %s", string(data))
+	}
+
+	// .env should NOT be overwritten
+	data, _ = os.ReadFile(filepath.Join(dir, ".env"))
+	if string(data) != customEnv {
+		t.Errorf(".env was overwritten, got: %s", string(data))
+	}
+}
+
+func TestInitNonResearchDirWithContentWarnsAndExits(t *testing.T) {
+	dir := t.TempDir()
+	// Has content but no raw/ or formatted/
+	os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("stuff"), 0644)
+	os.MkdirAll(filepath.Join(dir, "other-dir"), 0755)
+
+	var buf bytes.Buffer
+	err := runInit([]string{dir}, &buf, fakeKeyReader(""))
+	if err == nil {
+		t.Fatal("expected error for directory with content but no raw/formatted")
+	}
+	if !strings.Contains(err.Error(), "not a research directory") {
+		t.Errorf("expected 'not a research directory' error, got: %v", err)
+	}
+}
+
 func TestInitPromptsForAPIKey(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "project")
