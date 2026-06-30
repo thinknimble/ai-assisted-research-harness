@@ -1,0 +1,171 @@
+---
+title: "Document Template & Frontmatter Reference"
+type: reference
+status: active
+created: 2026-06-06
+updated: 2026-06-30
+author: pari
+
+source: local
+path: /Users/pariwork/Documents/sandbox/research-assistant/doc-template.yaml
+
+tags: [meta, template, frontmatter, research]
+related: []
+summary: "Defines the standard frontmatter schema and doc types for research document stubs."
+---
+
+# Document Template & Frontmatter Reference
+
+## Frontmatter Schema
+
+```yaml
+---
+title: ""           # Human-readable doc title
+type: ""            # See "Doc Types" below
+status: ""          # draft | active | archived
+created: ""         # YYYY-MM-DD
+updated: ""         # YYYY-MM-DD
+author: ""          # Who created/owns this doc
+
+# Location — at least one of source_url or path must be set
+source: ""          # github | google-drive | local | web
+source_url: ""      # Full URL (GitHub, Google Drive, website, etc.)
+repo: ""            # GitHub org/repo (e.g. "anthropics/claude-code") — when source: github
+path: ""            # Path within repo or local filesystem
+
+# Context
+tags: []            # Freeform tags for search and filtering
+related: []         # Paths or URLs to related docs
+summary: ""         # 1-2 sentence summary — lets an LLM decide relevance without reading the full doc
+---
+```
+
+## Doc Types
+
+| Type | Purpose |
+|---|---|
+| `paper` | Academic paper, whitepaper, or technical report |
+| `article` | Blog post, news article, or online essay |
+| `repo` | A GitHub repository as a whole (README, architecture, etc.) |
+| `code` | Specific source file, module, or code snippet worth referencing |
+| `spec` | Technical or product specification |
+| `reference` | Meta-docs, templates, glossaries, lookup tables |
+| `notes` | Personal research notes, reading notes, or annotations |
+| `decision-log` | Records a decision made, the options considered, and the reasoning |
+| `dataset` | Dataset description, schema, or sample data |
+
+## Rules
+
+1. **Every doc gets frontmatter.** No exceptions.
+2. **GitHub docs get local stubs.** The stub has frontmatter + summary only. The `source_url` points to the full content on GitHub.
+3. **Local docs are the full doc.** Frontmatter sits at the top of the actual content.
+4. **`summary` is mandatory.** This is what lets an LLM scan a folder of docs and decide which ones to read in full.
+5. **`related` links docs together.** Use local paths for local docs, URLs for external docs.
+6. **`repo` should be set for GitHub sources.** Makes it easy to clone, fetch, or query the repo programmatically.
+
+## Examples
+
+### GitHub doc (content lives on GitHub)
+
+```yaml
+---
+title: "Anthropic Cookbook - Tool Use Patterns"
+type: code
+status: active
+created: 2026-06-15
+updated: 2026-06-15
+author: pari
+
+source: github
+source_url: "https://github.com/anthropics/anthropic-cookbook/blob/main/tool_use/tool_use.ipynb"
+repo: "anthropics/anthropic-cookbook"
+path: "tool_use/tool_use.ipynb"
+
+tags: [tool-use, claude, patterns, notebook]
+related: []
+summary: "Jupyter notebook demonstrating tool use patterns with Claude — parallel tools, error handling, and structured output."
+---
+```
+
+### GitHub repo (referencing a whole repo)
+
+```yaml
+---
+title: "LangGraph - Multi-Agent Orchestration"
+type: repo
+status: active
+created: 2026-06-20
+updated: 2026-06-20
+author: pari
+
+source: github
+source_url: "https://github.com/langchain-ai/langgraph"
+repo: "langchain-ai/langgraph"
+
+tags: [agents, orchestration, langchain, multi-agent]
+related: []
+summary: "Framework for building stateful multi-agent applications with LLMs. Uses graph-based control flow."
+---
+```
+
+### Paper / web article
+
+```yaml
+---
+title: "Attention Is All You Need"
+type: paper
+status: active
+created: 2026-06-10
+updated: 2026-06-10
+author: pari
+
+source: web
+source_url: "https://arxiv.org/abs/1706.03762"
+
+tags: [transformers, attention, architecture, foundational]
+related: []
+summary: "Introduces the Transformer architecture — self-attention replaces recurrence and convolution for sequence modeling."
+---
+```
+
+### Local research notes
+
+```yaml
+---
+title: "RAG Architecture Comparison Notes"
+type: notes
+status: draft
+created: 2026-06-25
+updated: 2026-06-30
+author: pari
+
+source: local
+path: /Users/pariwork/Documents/sandbox/research-assistant/notes/rag-comparison.md
+
+tags: [rag, retrieval, architecture, comparison]
+related:
+  - "https://github.com/langchain-ai/langgraph"
+  - /Users/pariwork/Documents/sandbox/research-assistant/notes/embeddings.md
+summary: "Comparing naive RAG, advanced RAG with re-ranking, and graph RAG approaches. Benchmarked on internal dataset."
+---
+```
+
+### Google Drive stub (content lives in Drive)
+
+```yaml
+---
+title: "Q3 Research Roadmap"
+type: notes
+status: active
+created: 2026-06-01
+updated: 2026-06-01
+author: pari
+
+source: google-drive
+source_url: "https://docs.google.com/document/d/abc123/edit"
+
+tags: [planning, roadmap, q3]
+related: []
+summary: "Research priorities for Q3 — agent architectures, eval frameworks, and retrieval improvements."
+---
+```
