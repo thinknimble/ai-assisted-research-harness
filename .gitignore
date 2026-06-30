@@ -1,0 +1,7 @@
+research-assistant
+ai-assisted-research-harness
+site/
+.env
+.DS_Store
+.claude/
+.playwright-mcp/
