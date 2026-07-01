@@ -15,6 +15,22 @@ research-assistant init ~/research/api-docs
 
 Each one creates a self-contained library with its own folders and API key.
 
+## Registering an existing repo
+
+If you already have a folder with `raw/` and `formatted/` directories — for example, a repo you cloned from a teammate — run `init` on it:
+
+```bash
+research-assistant init ~/projects/shared-research
+```
+
+The tool detects the existing structure and registers it without overwriting anything:
+
+```
+Found existing research directory, registered as "shared-research"
+```
+
+Your existing `doc-template.yaml`, `.env`, and all documents are left untouched.
+
 ## Listing your repos
 
 See all registered repos:

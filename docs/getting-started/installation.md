@@ -7,13 +7,28 @@
 
 ## Step 1: Download the tool
 
-Ask your team lead for the latest `research-assistant` file, or build it yourself if you have Go installed:
+Go to the [Releases page](https://github.com/thinknimble/ai-assisted-research-harness/releases) and download the right file for your system:
+
+| System | File |
+|---|---|
+| Mac (Apple Silicon) | `research-assistant-darwin-arm64` |
+| Mac (Intel) | `research-assistant-darwin-amd64` |
+| Linux | `research-assistant-linux-amd64` |
+| Windows | `research-assistant-windows-amd64.exe` |
+
+Rename the downloaded file to `research-assistant` (or `research-assistant.exe` on Windows) and put it somewhere convenient.
+
+On macOS or Linux, make it executable:
 
 ```bash
-go build -o research-assistant .
+chmod +x research-assistant
 ```
 
-This creates a file called `research-assistant` in your project folder.
+??? tip "Building from source"
+    If you have Go installed, you can build it yourself:
+    ```bash
+    go build -o research-assistant .
+    ```
 
 ## Step 2: Create a research library
 
@@ -47,6 +62,22 @@ Next: run:
 !!! warning "Keep your key private"
     The `.env` file contains your personal API key. Never share it or commit it to GitHub.
 
+### Registering an existing library
+
+If you already have a folder with `raw/` and `formatted/` directories (for example, you cloned a teammate's repo), you can register it without creating new files:
+
+```bash
+research-assistant init /path/to/existing-project
+```
+
+The tool detects the existing structure and just registers it:
+
+```
+Found existing research directory, registered as "existing-project"
+```
+
+It won't overwrite your `doc-template.yaml` or `.env` if they already exist.
+
 ## Step 3: Verify it works
 
 ```bash
@@ -70,7 +101,7 @@ Type `quit` to exit. You're all set!
 :   Your `.env` file is missing or the key is not set correctly. Make sure it contains `ANTHROPIC_API_KEY=sk-ant-...`
 
 **"command not found: research-assistant"**
-:   You need to use `./research-assistant` (with the `./` prefix), or add the tool to a directory in your PATH.
+:   You need to use `./research-assistant` (with the `./` prefix), or move the tool to a directory in your PATH.
 
 **"permission denied"**
 :   On macOS or Linux, make the file executable:
@@ -78,5 +109,5 @@ Type `quit` to exit. You're all set!
     chmod +x research-assistant
     ```
 
-**"directory already has content — aborting"**
-:   The `init` command won't overwrite an existing folder. Either choose a new name or use an empty directory.
+**"directory already has content that is not a research directory — aborting"**
+:   The folder exists but doesn't look like a research library (no `raw/` and `formatted/` directories). Either choose a new folder name or use an empty directory.

@@ -44,7 +44,17 @@ If you used `research-assistant init`, this file was created for you.
 
 ### Can I use this on Windows?
 
-Yes. Build the tool with `go build -o research-assistant.exe .` and run it the same way. The `.env` file works the same on all platforms.
+Yes. Download the Windows binary from the [Releases page](https://github.com/thinknimble/ai-assisted-research-harness/releases), or build from source with `go build -o research-assistant.exe .`. The `.env` file works the same on all platforms.
+
+### I already have a folder with raw/ and formatted/ — do I need to start over?
+
+No. Run `init` on the existing folder:
+
+```bash
+research-assistant init /path/to/existing-folder
+```
+
+It detects the existing structure and registers it without overwriting your files.
 
 ---
 
@@ -154,9 +164,9 @@ Common causes:
 - **Invalid API key** — Double-check your `.env` file.
 - **Insufficient credits** — Check your balance at [console.anthropic.com](https://console.anthropic.com/).
 
-### "directory already has content — aborting"
+### "directory already has content that is not a research directory — aborting"
 
-The `init` command won't overwrite existing folders. Use a new folder name, or clear the target directory first.
+The folder exists but doesn't look like a research library (no `raw/` and `formatted/` directories). Choose a new folder name, use an empty directory, or add `raw/` and `formatted/` folders manually and run `init` again.
 
 ### "unknown repo" error
 

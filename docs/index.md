@@ -26,12 +26,20 @@ Anyone who collects research documents (articles, API docs, notes, papers) and w
 
 ## Quick start
 
+Download the latest binary from the [Releases page](https://github.com/thinknimble/ai-assisted-research-harness/releases), then:
+
 ```bash
 # Set up a new research library
 research-assistant init my-research
 
 # Start asking questions
 research-assistant --mode reception
+```
+
+Already have a folder with research documents? You can register it directly:
+
+```bash
+research-assistant init /path/to/existing-project
 ```
 
 See [Getting Started](getting-started/installation.md) for the full walkthrough.
