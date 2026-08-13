@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -174,6 +175,37 @@ func handleBackofficeTool(name string, input json.RawMessage) (string, error) {
 	default:
 		return "", fmt.Errorf("unknown tool: %s", name)
 	}
+}
+
+// unprocessedRawFiles returns raw files that have no corresponding stub in formatted/.
+func unprocessedRawFiles() ([]string, error) {
+	rawFiles, err := listDir("raw")
+	if err != nil {
+		return nil, err
+	}
+	formattedFiles, err := listDir("formatted")
+	if err != nil {
+		// formatted/ might not have any files yet
+		formattedFiles = nil
+	}
+
+	// Build set of formatted basenames (without extension)
+	formattedSet := make(map[string]bool)
+	for _, f := range formattedFiles {
+		base := filepath.Base(f)
+		name := strings.TrimSuffix(base, filepath.Ext(base))
+		formattedSet[name] = true
+	}
+
+	var unprocessed []string
+	for _, f := range rawFiles {
+		base := filepath.Base(f)
+		name := strings.TrimSuffix(base, filepath.Ext(base))
+		if !formattedSet[name] {
+			unprocessed = append(unprocessed, f)
+		}
+	}
+	return unprocessed, nil
 }
 
 func gitAddCommitPush(message string) (string, error) {

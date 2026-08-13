@@ -21,5 +21,5 @@ config. This lets users adopt existing research directories they set up manually
   as {name}"
 - Missing pieces are filled in (e.g., if `doc-template.yaml` is absent, it is
   written; existing files are never overwritten)
-- If the target directory has content but no `raw/` or `formatted/` (not a
-  research directory), init warns and exits without changes
+- If the target directory has content but no `raw/` or `formatted/`, init creates
+  the structure, moves existing files into `raw/`, and registers the directory

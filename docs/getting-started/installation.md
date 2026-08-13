@@ -62,6 +62,23 @@ Next: run:
 !!! warning "Keep your key private"
     The `.env` file contains your personal API key. Never share it or commit it to GitHub.
 
+### Using an existing folder of documents
+
+If you already have a folder of documents (emails, PDFs, notes), you can point `init` at it. The tool will move your files into `raw/` and set up the research structure around them:
+
+```bash
+research-assistant init ~/Downloads/my-documents
+```
+
+```
+Moved 15 existing files into raw/
+Created research directory at /Users/you/Downloads/my-documents
+  raw/
+  formatted/
+  doc-template.yaml
+  .env
+```
+
 ### Registering an existing library
 
 If you already have a folder with `raw/` and `formatted/` directories (for example, you cloned a teammate's repo), you can register it without creating new files:
@@ -109,5 +126,5 @@ Type `quit` to exit. You're all set!
     chmod +x research-assistant
     ```
 
-**"directory already has content that is not a research directory — aborting"**
-:   The folder exists but doesn't look like a research library (no `raw/` and `formatted/` directories). Either choose a new folder name or use an empty directory.
+**"failed to move ... to raw/"**
+:   The tool tried to adopt your existing files into `raw/` but couldn't move one of them. Check file permissions and try again.

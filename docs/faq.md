@@ -164,9 +164,15 @@ Common causes:
 - **Invalid API key** — Double-check your `.env` file.
 - **Insufficient credits** — Check your balance at [console.anthropic.com](https://console.anthropic.com/).
 
-### "directory already has content that is not a research directory — aborting"
+### I have a folder of documents but no raw/ or formatted/ — can I use init?
 
-The folder exists but doesn't look like a research library (no `raw/` and `formatted/` directories). Choose a new folder name, use an empty directory, or add `raw/` and `formatted/` folders manually and run `init` again.
+Yes. Run `init` on the folder and it will automatically move your existing files into `raw/` and create the research structure:
+
+```bash
+research-assistant init ~/Downloads/my-documents
+```
+
+You'll see a message like "Moved 15 existing files into raw/".
 
 ### "unknown repo" error
 

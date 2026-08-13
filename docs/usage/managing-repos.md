@@ -15,6 +15,21 @@ research-assistant init ~/research/api-docs
 
 Each one creates a self-contained library with its own folders and API key.
 
+## Importing an existing folder of documents
+
+If you have a folder of documents (emails, PDFs, notes) that isn't set up as a research library yet, `init` will adopt them:
+
+```bash
+research-assistant init ~/Downloads/client-emails
+```
+
+The tool moves your existing files into `raw/` and creates the research structure around them:
+
+```
+Moved 20 existing files into raw/
+Created research directory at /Users/you/Downloads/client-emails
+```
+
 ## Registering an existing repo
 
 If you already have a folder with `raw/` and `formatted/` directories — for example, a repo you cloned from a teammate — run `init` on it:

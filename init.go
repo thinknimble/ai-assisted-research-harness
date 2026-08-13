@@ -25,6 +25,7 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error)) er
 
 	// Check if directory exists and has content
 	existingResearchDir := false
+	adoptedFiles := false
 	entries, err := os.ReadDir(absTarget)
 	if err == nil && len(entries) > 0 {
 		hasRaw := false
@@ -40,11 +41,31 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error)) er
 		if hasRaw && hasFormatted {
 			existingResearchDir = true
 		} else {
-			return fmt.Errorf("directory %s already has content that is not a research directory — aborting to avoid overwriting", absTarget)
+			// Directory has files but no research structure — adopt them into raw/
+			if err := os.MkdirAll(filepath.Join(absTarget, "raw"), 0755); err != nil {
+				return fmt.Errorf("failed to create raw/: %w", err)
+			}
+			moved := 0
+			for _, e := range entries {
+				if e.Name() == "raw" || e.Name() == "formatted" {
+					continue
+				}
+				oldPath := filepath.Join(absTarget, e.Name())
+				newPath := filepath.Join(absTarget, "raw", e.Name())
+				if err := os.Rename(oldPath, newPath); err != nil {
+					return fmt.Errorf("failed to move %s to raw/: %w", e.Name(), err)
+				}
+				moved++
+			}
+			if err := os.MkdirAll(filepath.Join(absTarget, "formatted"), 0755); err != nil {
+				return fmt.Errorf("failed to create formatted/: %w", err)
+			}
+			adoptedFiles = true
+			fmt.Fprintf(stdout, "Moved %d existing files into raw/\n", moved)
 		}
 	}
 
-	if !existingResearchDir {
+	if !existingResearchDir && !adoptedFiles {
 		// Create directory structure from scratch
 		if err := os.MkdirAll(filepath.Join(absTarget, "raw"), 0755); err != nil {
 			return fmt.Errorf("failed to create raw/: %w", err)

@@ -13,6 +13,7 @@ func fakeKeyReader(key string) func() (string, error) {
 }
 
 func TestInitCreatesDirectoryStructure(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	dir := t.TempDir()
 	target := filepath.Join(dir, "my-research")
 
@@ -48,6 +49,7 @@ func TestInitCreatesDirectoryStructure(t *testing.T) {
 }
 
 func TestInitDefaultsToCurrentDir(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	dir := t.TempDir()
 	orig, _ := os.Getwd()
 	os.Chdir(dir)
@@ -65,21 +67,42 @@ func TestInitDefaultsToCurrentDir(t *testing.T) {
 	}
 }
 
-func TestInitAbortsIfDirectoryHasNonResearchContent(t *testing.T) {
+func TestInitAdoptsExistingFilesIntoRaw(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "existing.txt"), []byte("data"), 0644)
+	os.WriteFile(filepath.Join(dir, "notes.pdf"), []byte("pdf"), 0644)
 
 	var buf bytes.Buffer
-	err := runInit([]string{dir}, &buf, fakeKeyReader(""))
-	if err == nil {
-		t.Fatal("expected error for non-research directory with content")
+	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"))
+	if err != nil {
+		t.Fatalf("expected init to adopt files, got error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "not a research directory") {
-		t.Errorf("expected 'not a research directory' error, got: %v", err)
+
+	// Files should be moved into raw/
+	if _, err := os.Stat(filepath.Join(dir, "raw", "existing.txt")); err != nil {
+		t.Error("expected existing.txt in raw/")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "raw", "notes.pdf")); err != nil {
+		t.Error("expected notes.pdf in raw/")
+	}
+	// Original locations should be gone
+	if _, err := os.Stat(filepath.Join(dir, "existing.txt")); err == nil {
+		t.Error("existing.txt should have been moved from root")
+	}
+	// formatted/ should exist
+	if _, err := os.Stat(filepath.Join(dir, "formatted")); err != nil {
+		t.Error("expected formatted/ to be created")
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Moved 2 existing files into raw/") {
+		t.Errorf("expected adoption message, got: %s", output)
 	}
 }
 
 func TestInitAllowsExistingResearchDirectory(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "raw"), 0755)
 	os.MkdirAll(filepath.Join(dir, "formatted"), 0755)
@@ -183,23 +206,29 @@ func TestInitExistingDirNeverOverwritesFiles(t *testing.T) {
 	}
 }
 
-func TestInitNonResearchDirWithContentWarnsAndExits(t *testing.T) {
+func TestInitAdoptsFilesAndSubdirs(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	dir := t.TempDir()
-	// Has content but no raw/ or formatted/
 	os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("stuff"), 0644)
 	os.MkdirAll(filepath.Join(dir, "other-dir"), 0755)
 
 	var buf bytes.Buffer
-	err := runInit([]string{dir}, &buf, fakeKeyReader(""))
-	if err == nil {
-		t.Fatal("expected error for directory with content but no raw/formatted")
+	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"))
+	if err != nil {
+		t.Fatalf("expected init to adopt content, got error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "not a research directory") {
-		t.Errorf("expected 'not a research directory' error, got: %v", err)
+
+	// Both files and subdirs should move into raw/
+	if _, err := os.Stat(filepath.Join(dir, "raw", "notes.txt")); err != nil {
+		t.Error("expected notes.txt in raw/")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "raw", "other-dir")); err != nil {
+		t.Error("expected other-dir in raw/")
 	}
 }
 
 func TestInitPromptsForAPIKey(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	dir := t.TempDir()
 	target := filepath.Join(dir, "project")
 
@@ -261,6 +290,7 @@ func TestInitRegistersRepoInGlobalConfig(t *testing.T) {
 }
 
 func TestInitSkippedKeyWritesPlaceholder(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	dir := t.TempDir()
 	target := filepath.Join(dir, "project")
 

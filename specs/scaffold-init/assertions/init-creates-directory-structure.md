@@ -17,6 +17,6 @@ with all required folders and files.
 - If no path argument is given, scaffolds in the current working directory
 - The created structure contains: `raw/`, `formatted/`, and `doc-template.yaml`
 - If the target directory has content that is not a research directory (no `raw/`
-  or `formatted/`), the command warns and exits without overwriting
+  or `formatted/`), init creates the structure and moves existing files into `raw/`
 - The command prints a success message with next steps when complete
   (e.g., "Run `research-assistant --mode backoffice` to start")

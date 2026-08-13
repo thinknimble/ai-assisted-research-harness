@@ -116,6 +116,13 @@ func ResolveProjectRoot(repoFlag string) (string, error) {
 		return path, nil
 	}
 
+	// If cwd matches a registered repo, use it (most intuitive behavior)
+	for _, path := range cfg.Repos {
+		if path == cwd {
+			return cwd, nil
+		}
+	}
+
 	// No flag: use default if set
 	if cfg.Default != "" {
 		if path, ok := cfg.Repos[cfg.Default]; ok {

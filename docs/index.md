@@ -36,10 +36,10 @@ research-assistant init my-research
 research-assistant --mode reception
 ```
 
-Already have a folder with research documents? You can register it directly:
+Already have a folder with research documents? Point `init` at it and your files will be moved into `raw/` automatically:
 
 ```bash
-research-assistant init /path/to/existing-project
+research-assistant init /path/to/existing-documents
 ```
 
 See [Getting Started](getting-started/installation.md) for the full walkthrough.
