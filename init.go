@@ -47,7 +47,7 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error)) er
 			}
 			moved := 0
 			for _, e := range entries {
-				if e.Name() == "raw" || e.Name() == "formatted" {
+				if e.Name() == "raw" || e.Name() == "formatted" || e.Name() == "output" {
 					continue
 				}
 				oldPath := filepath.Join(absTarget, e.Name())
@@ -73,6 +73,11 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error)) er
 		if err := os.MkdirAll(filepath.Join(absTarget, "formatted"), 0755); err != nil {
 			return fmt.Errorf("failed to create formatted/: %w", err)
 		}
+	}
+
+	// Ensure output/ exists (for all paths: fresh, adopted, or existing)
+	if err := os.MkdirAll(filepath.Join(absTarget, "output"), 0755); err != nil {
+		return fmt.Errorf("failed to create output/: %w", err)
 	}
 
 	// Write doc-template.yaml only if it doesn't already exist
@@ -125,6 +130,7 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error)) er
 		fmt.Fprintf(stdout, "Created research directory at %s\n", absTarget)
 		fmt.Fprintln(stdout, "  raw/")
 		fmt.Fprintln(stdout, "  formatted/")
+		fmt.Fprintln(stdout, "  output/")
 		fmt.Fprintln(stdout, "  doc-template.yaml")
 		fmt.Fprintln(stdout, "  .env")
 		fmt.Fprintf(stdout, "  registered as %q in global config\n", repoName)

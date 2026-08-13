@@ -23,7 +23,7 @@ func TestInitCreatesDirectoryStructure(t *testing.T) {
 	}
 
 	// Verify directories exist
-	for _, sub := range []string{"raw", "formatted"} {
+	for _, sub := range []string{"raw", "formatted", "output"} {
 		info, err := os.Stat(filepath.Join(target, sub))
 		if err != nil {
 			t.Errorf("expected %s/ to exist: %v", sub, err)
@@ -41,10 +41,13 @@ func TestInitCreatesDirectoryStructure(t *testing.T) {
 		t.Error("doc-template.yaml is empty")
 	}
 
-	// Verify success message
+	// Verify success message includes output/
 	output := buf.String()
 	if !strings.Contains(output, "Created research directory") {
 		t.Errorf("expected success message, got: %s", output)
+	}
+	if !strings.Contains(output, "output/") {
+		t.Errorf("expected output/ in directory listing, got: %s", output)
 	}
 }
 
@@ -60,7 +63,7 @@ func TestInitDefaultsToCurrentDir(t *testing.T) {
 		t.Fatalf("runInit with no args failed: %v", err)
 	}
 
-	for _, name := range []string{"raw", "formatted", "doc-template.yaml", ".env"} {
+	for _, name := range []string{"raw", "formatted", "output", "doc-template.yaml", ".env"} {
 		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
 			t.Errorf("expected %s in current directory", name)
 		}
@@ -90,9 +93,12 @@ func TestInitAdoptsExistingFilesIntoRaw(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "existing.txt")); err == nil {
 		t.Error("existing.txt should have been moved from root")
 	}
-	// formatted/ should exist
+	// formatted/ and output/ should exist
 	if _, err := os.Stat(filepath.Join(dir, "formatted")); err != nil {
 		t.Error("expected formatted/ to be created")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "output")); err != nil {
+		t.Error("expected output/ to be created")
 	}
 
 	output := buf.String()
@@ -111,6 +117,27 @@ func TestInitAllowsExistingResearchDirectory(t *testing.T) {
 	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"))
 	if err != nil {
 		t.Fatalf("expected init to succeed for existing research directory, got: %v", err)
+	}
+}
+
+func TestInitExistingResearchDirGetsOutputDir(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "raw"), 0755)
+	os.MkdirAll(filepath.Join(dir, "formatted"), 0755)
+	// No output/ exists yet
+
+	var buf bytes.Buffer
+	if err := runInit([]string{dir}, &buf, fakeKeyReader("")); err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	info, err := os.Stat(filepath.Join(dir, "output"))
+	if err != nil {
+		t.Fatalf("expected output/ to be created: %v", err)
+	}
+	if !info.IsDir() {
+		t.Error("expected output to be a directory")
 	}
 }
 

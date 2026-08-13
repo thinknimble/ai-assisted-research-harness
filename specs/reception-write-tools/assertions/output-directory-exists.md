@@ -3,7 +3,7 @@ id: output-directory-exists
 parent: reception-write-tools
 created: 2026-08-13T00:00:00Z
 priority: 1
-status: not_started
+status: done
 ---
 
 # Output Directory Exists in Research Repos
