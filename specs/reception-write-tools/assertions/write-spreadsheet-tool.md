@@ -3,7 +3,7 @@ id: write-spreadsheet-tool
 parent: reception-write-tools
 created: 2026-08-13T00:00:00Z
 priority: 1
-status: not_started
+status: done
 depends-on: output-directory-exists
 ---
 
