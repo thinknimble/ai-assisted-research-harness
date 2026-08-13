@@ -3,7 +3,8 @@ id: docs-reflect-write-tools
 parent: reception-write-tools
 created: 2026-08-13T00:00:00Z
 priority: 2
-status: not_started
+status: in_progress
+locked-by: builder-MacBook-Pro.local-63475-1786641296
 depends-on: write-text-file-tool
 ---
 
