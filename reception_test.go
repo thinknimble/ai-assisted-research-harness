@@ -103,6 +103,102 @@ func TestWriteSpreadsheetTool(t *testing.T) {
 	})
 }
 
+func TestWriteTextFileTool(t *testing.T) {
+	tmp := t.TempDir()
+	origRoot := projectRoot
+	projectRoot = tmp
+	t.Cleanup(func() { projectRoot = origRoot })
+
+	if err := os.MkdirAll(filepath.Join(tmp, "output"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("writes markdown file and returns confirmation", func(t *testing.T) {
+		input := map[string]any{
+			"filename": "summary.md",
+			"content":  "# Hello\nWorld",
+		}
+		raw, _ := json.Marshal(input)
+
+		result, err := handleReceptionTool("write_text_file", raw)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != "Written output/summary.md" {
+			t.Errorf("got %q, want %q", result, "Written output/summary.md")
+		}
+
+		data, err := os.ReadFile(filepath.Join(tmp, "output", "summary.md"))
+		if err != nil {
+			t.Fatalf("file not created: %v", err)
+		}
+		if string(data) != "# Hello\nWorld" {
+			t.Errorf("content = %q", string(data))
+		}
+	})
+
+	t.Run("accepts all allowed extensions", func(t *testing.T) {
+		for _, ext := range []string{".csv", ".json", ".txt"} {
+			input := map[string]any{
+				"filename": "test" + ext,
+				"content":  "data",
+			}
+			raw, _ := json.Marshal(input)
+			_, err := handleReceptionTool("write_text_file", raw)
+			if err != nil {
+				t.Errorf("extension %s should be allowed, got error: %v", ext, err)
+			}
+		}
+	})
+
+	t.Run("rejects disallowed extension with error message", func(t *testing.T) {
+		input := map[string]any{
+			"filename": "hack.exe",
+			"content":  "bad",
+		}
+		raw, _ := json.Marshal(input)
+
+		result, err := handleReceptionTool("write_text_file", raw)
+		if err != nil {
+			t.Fatalf("should return error message, not Go error: %v", err)
+		}
+		if !strings.Contains(result, ".md") || !strings.Contains(result, ".csv") ||
+			!strings.Contains(result, ".json") || !strings.Contains(result, ".txt") {
+			t.Errorf("rejection message should list allowed types, got: %q", result)
+		}
+	})
+}
+
+func TestSetupReceptionIncludesWriteTextFile(t *testing.T) {
+	setup := setupReception()
+
+	found := false
+	for _, tool := range setup.Tools {
+		if tool.OfTool != nil && tool.OfTool.Name == "write_text_file" {
+			found = true
+			props, ok := tool.OfTool.InputSchema.Properties.(map[string]any)
+			if !ok {
+				t.Fatal("InputSchema.Properties is not map[string]any")
+			}
+			for _, param := range []string{"filename", "content"} {
+				if _, exists := props[param]; !exists {
+					t.Errorf("missing required parameter: %s", param)
+				}
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("write_text_file tool not found in setupReception()")
+	}
+}
+
+func TestReceptionSystemPromptMentionsWriteTextFile(t *testing.T) {
+	if !strings.Contains(receptionSystemPrompt, "write_text_file") {
+		t.Error("system prompt should mention write_text_file")
+	}
+}
+
 func TestSetupReceptionIncludesWriteSpreadsheet(t *testing.T) {
 	setup := setupReception()
 

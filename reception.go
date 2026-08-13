@@ -26,7 +26,8 @@ const receptionSystemPrompt = `You are a research assistant with access to a lib
 - If no documents are relevant, say so honestly.
 - Cite which documents you used in your answer.
 - You can read multiple raw files if needed to answer comprehensively.
-- Use write_spreadsheet to export tabular data as an Excel file — pass column headers and row data as JSON arrays`
+- Use write_spreadsheet to export tabular data as an Excel file — pass column headers and row data as JSON arrays
+- Use write_text_file to save research summaries, data extractions, or structured output`
 
 func setupReception() ModeSetup {
 	tools := []anthropic.ToolUnionParam{
@@ -64,6 +65,25 @@ func setupReception() ModeSetup {
 						},
 					},
 					Required: []string{"filename", "headers", "rows"},
+				},
+			},
+		},
+		{
+			OfTool: &anthropic.ToolParam{
+				Name:        "write_text_file",
+				Description: anthropic.String("Write a plain-text file (Markdown, CSV, JSON, or TXT) to the output directory."),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: map[string]any{
+						"filename": map[string]any{
+							"type":        "string",
+							"description": "Output filename (must end in .md, .csv, .json, or .txt)",
+						},
+						"content": map[string]any{
+							"type":        "string",
+							"description": "Text content to write to the file",
+						},
+					},
+					Required: []string{"filename", "content"},
 				},
 			},
 		},
@@ -112,6 +132,9 @@ func handleReceptionTool(name string, input json.RawMessage) (string, error) {
 		}
 		return sb.String(), nil
 
+	case "write_text_file":
+		return handleWriteTextFile(input)
+
 	case "write_spreadsheet":
 		return handleWriteSpreadsheet(input)
 
@@ -131,6 +154,34 @@ func handleReceptionTool(name string, input json.RawMessage) (string, error) {
 	default:
 		return "", fmt.Errorf("unknown tool: %s", name)
 	}
+}
+
+var allowedTextExtensions = map[string]bool{
+	".md":   true,
+	".csv":  true,
+	".json": true,
+	".txt":  true,
+}
+
+func handleWriteTextFile(input json.RawMessage) (string, error) {
+	var params struct {
+		Filename string `json:"filename"`
+		Content  string `json:"content"`
+	}
+	if err := json.Unmarshal(input, &params); err != nil {
+		return "", fmt.Errorf("invalid input: %w", err)
+	}
+
+	ext := strings.ToLower(filepath.Ext(params.Filename))
+	if !allowedTextExtensions[ext] {
+		return fmt.Sprintf("Unsupported extension %q — allowed types: .md, .csv, .json, .txt", ext), nil
+	}
+
+	if err := writeFile("output", params.Filename, params.Content); err != nil {
+		return "", fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return fmt.Sprintf("Written output/%s", filepath.Base(params.Filename)), nil
 }
 
 func handleWriteSpreadsheet(input json.RawMessage) (string, error) {
