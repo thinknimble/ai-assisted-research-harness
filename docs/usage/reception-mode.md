@@ -53,6 +53,60 @@ While the assistant works, you'll see status messages in square brackets:
 
 The final answer streams in word by word as it's generated.
 
+## Writing output files
+
+Reception mode can write files to your `output/` directory — summaries, data exports, spreadsheets, and more. Just ask the assistant to create a file and it will save it for you.
+
+### Text file output
+
+The assistant can write `.md`, `.csv`, `.json`, and `.txt` files.
+
+```
+> Can you write a summary of everything we have on webhook security?
+[using list_stubs...]
+[done]
+[using read_raw_file: raw/survey-webhooks/typeform-webhooks.md...]
+[done]
+[using read_raw_file: raw/survey-webhooks/qualtrics-webhooks.md...]
+[done]
+[using write_text_file: output/webhook-security-summary.md...]
+[done]
+
+I've written a summary of webhook security across your documents to
+output/webhook-security-summary.md. It covers HMAC verification for
+Typeform and Qualtrics, including code examples.
+```
+
+### Spreadsheet output
+
+The assistant can write `.xlsx` spreadsheets when you need tabular data.
+
+```
+> Export a comparison table of all webhook providers as a spreadsheet
+[using list_stubs...]
+[done]
+[using read_raw_file: raw/survey-webhooks/typeform-webhooks.md...]
+[done]
+[using read_raw_file: raw/survey-webhooks/qualtrics-webhooks.md...]
+[done]
+[using write_spreadsheet: output/webhook-comparison.xlsx...]
+[done]
+
+I've created a spreadsheet at output/webhook-comparison.xlsx with columns
+for provider, auth method, payload format, and retry policy.
+```
+
+### Where output files are saved
+
+All output files are saved to the `output/` directory in your research library. The assistant creates filenames based on what you asked for.
+
+### Output status messages
+
+| Message | Meaning |
+|---|---|
+| `[using write_text_file: path...]` | Writing a text file (`.md`, `.csv`, `.json`, `.txt`) |
+| `[using write_spreadsheet: path...]` | Writing an Excel spreadsheet (`.xlsx`) |
+
 ## Tips for good questions
 
 !!! tip "Be specific"
@@ -70,6 +124,7 @@ The final answer streams in word by word as it's generated.
 - Compare information across multiple documents
 - Summarize long documents
 - Find specific details (API endpoints, field names, code examples)
+- Export research as markdown summaries, CSV data, or Excel spreadsheets
 
 ## What it cannot do
 

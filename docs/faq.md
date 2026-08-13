@@ -119,6 +119,14 @@ Yes. The assistant remembers your conversation within a single session. You can 
 
 No. Each time you start the tool, it starts fresh. Your documents are still there, but the conversation history resets.
 
+### What file formats can the assistant write?
+
+The assistant can write text-based files — `.md`, `.csv`, `.json`, and `.txt` — as well as Excel spreadsheets (`.xlsx`). Just ask it to create a file and it will save it to the `output/` directory.
+
+### Where do output files go?
+
+All output files are saved to the `output/` directory inside your research library. This directory is created automatically by `init`. You can open the files with any compatible application — for example, `.xlsx` files open in Excel or Google Sheets.
+
 ---
 
 ## Backoffice mode

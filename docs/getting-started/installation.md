@@ -45,6 +45,7 @@ Enter your Anthropic API key: ********
 Created research directory at /Users/you/my-research
   raw/
   formatted/
+  output/
   doc-template.yaml
   .env
   registered as "my-research" in global config
@@ -56,6 +57,7 @@ Next: run:
 !!! tip "What `init` creates"
     - `raw/` — where you'll put your full documents
     - `formatted/` — where the assistant stores document summaries
+    - `output/` — where reception saves generated files
     - `doc-template.yaml` — the template that defines how summaries are structured
     - `.env` — your API key (kept private, never shared)
 
