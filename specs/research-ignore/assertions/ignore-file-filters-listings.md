@@ -3,7 +3,7 @@ id: ignore-file-filters-listings
 parent: research-ignore
 created: 2026-08-18T17:00:00Z
 priority: 1
-status: not_started
+status: done
 ---
 
 # .researchignore Filters Directory Listings

@@ -13,6 +13,7 @@ import (
 	"github.com/extrame/xls"
 	"github.com/fumiama/go-docx"
 	"github.com/ledongthuc/pdf"
+	ignore "github.com/sabhiram/go-gitignore"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -351,8 +352,21 @@ func readXls(path string) (string, error) {
 	return content, nil
 }
 
+func loadResearchIgnore() *ignore.GitIgnore {
+	p := filepath.Join(projectRoot, ".researchignore")
+	gi, err := ignore.CompileIgnoreFile(p)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "warning: skipping .researchignore: %v\n", err)
+		}
+		return nil
+	}
+	return gi
+}
+
 func listDir(dir string) ([]string, error) {
 	root := filepath.Join(projectRoot, dir)
+	gi := loadResearchIgnore()
 	var files []string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -360,6 +374,9 @@ func listDir(dir string) ([]string, error) {
 		}
 		if !d.IsDir() {
 			rel, _ := filepath.Rel(projectRoot, path)
+			if gi != nil && gi.MatchesPath(rel) {
+				return nil
+			}
 			files = append(files, rel)
 		}
 		return nil
