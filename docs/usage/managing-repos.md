@@ -23,12 +23,20 @@ If you have a folder of documents (emails, PDFs, notes) that isn't set up as a r
 research-assistant init ~/Downloads/client-emails
 ```
 
-The tool moves your existing files into `raw/` and creates the research structure around them:
+The tool lists the files it found and asks you to confirm before moving them:
 
 ```
-Moved 20 existing files into raw/
+Files to move into raw/:
+  invoice.pdf
+  contract.docx
+  notes.txt
+Tip: add a .researchignore file to exclude files from adoption.
+Proceed? [y/N] y
+Moved 3 existing files into raw/
 Created research directory at /Users/you/Downloads/client-emails
 ```
+
+If you have files you don't want adopted, add a [`.researchignore`](research-ignore.md) file before running `init`.
 
 ## Registering an existing repo
 

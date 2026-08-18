@@ -75,14 +75,24 @@ If you already have a folder of documents (emails, PDFs, notes), you can point `
 research-assistant init ~/Downloads/my-documents
 ```
 
+The tool lists the files it will move and asks for confirmation:
+
 ```
-Moved 15 existing files into raw/
+Files to move into raw/:
+  report.pdf
+  meeting-notes.txt
+  data.xlsx
+Tip: add a .researchignore file to exclude files from adoption.
+Proceed? [y/N] y
+Moved 3 existing files into raw/
 Created research directory at /Users/you/Downloads/my-documents
   raw/
   formatted/
   doc-template.yaml
   .env
 ```
+
+Answering anything other than `y` or `Y` aborts without moving files.
 
 ### Registering an existing library
 
