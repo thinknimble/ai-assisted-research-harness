@@ -66,7 +66,10 @@ Next: run:
 
 ### Using an existing folder of documents
 
-If you already have a folder of documents (emails, PDFs, notes), you can point `init` at it. The tool will move your files into `raw/` and set up the research structure around them:
+If you already have a folder of documents (emails, PDFs, notes), you can point `init` at it. The tool will move your files into `raw/` and set up the research structure around them.
+
+!!! tip "Exclude files from adoption"
+    If you add a [`.researchignore`](../usage/research-ignore.md) file to the folder before running `init`, matching files won't be moved into `raw/`.
 
 ```bash
 research-assistant init ~/Downloads/my-documents

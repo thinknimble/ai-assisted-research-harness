@@ -16,6 +16,7 @@ nav = [
     "usage/reception-mode.md",
     "usage/backoffice-mode.md",
     "usage/managing-repos.md",
+    "usage/research-ignore.md",
   ]},
   { "FAQ" = "faq.md" },
 ]
