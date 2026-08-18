@@ -12,13 +12,17 @@ func fakeKeyReader(key string) func() (string, error) {
 	return func() (string, error) { return key, nil }
 }
 
+func fakeLineReader(line string) func() (string, error) {
+	return func() (string, error) { return line, nil }
+}
+
 func TestInitCreatesDirectoryStructure(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	dir := t.TempDir()
 	target := filepath.Join(dir, "my-research")
 
 	var buf bytes.Buffer
-	if err := runInit([]string{target}, &buf, fakeKeyReader("sk-test")); err != nil {
+	if err := runInit([]string{target}, &buf, fakeKeyReader("sk-test"), nil, false); err != nil {
 		t.Fatalf("runInit failed: %v", err)
 	}
 
@@ -59,7 +63,7 @@ func TestInitDefaultsToCurrentDir(t *testing.T) {
 	defer os.Chdir(orig)
 
 	var buf bytes.Buffer
-	if err := runInit(nil, &buf, fakeKeyReader("")); err != nil {
+	if err := runInit(nil, &buf, fakeKeyReader(""), nil, false); err != nil {
 		t.Fatalf("runInit with no args failed: %v", err)
 	}
 
@@ -77,7 +81,7 @@ func TestInitAdoptsExistingFilesIntoRaw(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "notes.pdf"), []byte("pdf"), 0644)
 
 	var buf bytes.Buffer
-	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"))
+	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"), nil, true)
 	if err != nil {
 		t.Fatalf("expected init to adopt files, got error: %v", err)
 	}
@@ -114,7 +118,7 @@ func TestInitAllowsExistingResearchDirectory(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, "formatted"), 0755)
 
 	var buf bytes.Buffer
-	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"))
+	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"), nil, false)
 	if err != nil {
 		t.Fatalf("expected init to succeed for existing research directory, got: %v", err)
 	}
@@ -128,7 +132,7 @@ func TestInitExistingResearchDirGetsOutputDir(t *testing.T) {
 	// No output/ exists yet
 
 	var buf bytes.Buffer
-	if err := runInit([]string{dir}, &buf, fakeKeyReader("")); err != nil {
+	if err := runInit([]string{dir}, &buf, fakeKeyReader(""), nil, false); err != nil {
 		t.Fatalf("runInit failed: %v", err)
 	}
 
@@ -149,7 +153,7 @@ func TestInitExistingResearchDirRegistersAndPrintsMessage(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, "formatted"), 0755)
 
 	var buf bytes.Buffer
-	err := runInit([]string{dir}, &buf, fakeKeyReader(""))
+	err := runInit([]string{dir}, &buf, fakeKeyReader(""), nil, false)
 	if err != nil {
 		t.Fatalf("runInit failed: %v", err)
 	}
@@ -188,7 +192,7 @@ func TestInitExistingDirFillsMissingTemplate(t *testing.T) {
 	// No doc-template.yaml exists
 
 	var buf bytes.Buffer
-	if err := runInit([]string{dir}, &buf, fakeKeyReader("")); err != nil {
+	if err := runInit([]string{dir}, &buf, fakeKeyReader(""), nil, false); err != nil {
 		t.Fatalf("runInit failed: %v", err)
 	}
 
@@ -216,7 +220,7 @@ func TestInitExistingDirNeverOverwritesFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, ".env"), []byte(customEnv), 0644)
 
 	var buf bytes.Buffer
-	if err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test")); err != nil {
+	if err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"), nil, false); err != nil {
 		t.Fatalf("runInit failed: %v", err)
 	}
 
@@ -240,7 +244,7 @@ func TestInitAdoptsFilesAndSubdirs(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, "other-dir"), 0755)
 
 	var buf bytes.Buffer
-	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"))
+	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"), nil, true)
 	if err != nil {
 		t.Fatalf("expected init to adopt content, got error: %v", err)
 	}
@@ -260,7 +264,7 @@ func TestInitPromptsForAPIKey(t *testing.T) {
 	target := filepath.Join(dir, "project")
 
 	var buf bytes.Buffer
-	if err := runInit([]string{target}, &buf, fakeKeyReader("sk-ant-my-secret-key")); err != nil {
+	if err := runInit([]string{target}, &buf, fakeKeyReader("sk-ant-my-secret-key"), nil, false); err != nil {
 		t.Fatalf("runInit failed: %v", err)
 	}
 
@@ -291,7 +295,7 @@ func TestInitRegistersRepoInGlobalConfig(t *testing.T) {
 	target := filepath.Join(tmp, "ai-papers")
 
 	var buf bytes.Buffer
-	if err := runInit([]string{target}, &buf, fakeKeyReader("sk-test")); err != nil {
+	if err := runInit([]string{target}, &buf, fakeKeyReader("sk-test"), nil, false); err != nil {
 		t.Fatalf("runInit failed: %v", err)
 	}
 
@@ -316,13 +320,50 @@ func TestInitRegistersRepoInGlobalConfig(t *testing.T) {
 	}
 }
 
+func TestInitRespectsResearchIgnore(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "keep.txt"), []byte("keep"), 0644)
+	os.WriteFile(filepath.Join(dir, "skip.log"), []byte("skip"), 0644)
+	os.WriteFile(filepath.Join(dir, "also-skip.tmp"), []byte("skip"), 0644)
+	os.WriteFile(filepath.Join(dir, ".researchignore"), []byte("*.log\n*.tmp\n"), 0644)
+
+	var buf bytes.Buffer
+	if err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"), nil, true); err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	// keep.txt should be moved into raw/
+	if _, err := os.Stat(filepath.Join(dir, "raw", "keep.txt")); err != nil {
+		t.Error("expected keep.txt in raw/")
+	}
+
+	// Ignored files should NOT be moved
+	if _, err := os.Stat(filepath.Join(dir, "skip.log")); err != nil {
+		t.Error("skip.log should remain in root (ignored)")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "also-skip.tmp")); err != nil {
+		t.Error("also-skip.tmp should remain in root (ignored)")
+	}
+
+	// .researchignore itself should stay in root
+	if _, err := os.Stat(filepath.Join(dir, ".researchignore")); err != nil {
+		t.Error(".researchignore should remain in root")
+	}
+
+	// Only 1 file should have been moved
+	if !strings.Contains(buf.String(), "Moved 1 existing files into raw/") {
+		t.Errorf("expected 1 file moved, got: %s", buf.String())
+	}
+}
+
 func TestInitSkippedKeyWritesPlaceholder(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	dir := t.TempDir()
 	target := filepath.Join(dir, "project")
 
 	var buf bytes.Buffer
-	if err := runInit([]string{target}, &buf, fakeKeyReader("")); err != nil {
+	if err := runInit([]string{target}, &buf, fakeKeyReader(""), nil, false); err != nil {
 		t.Fatalf("runInit failed: %v", err)
 	}
 
@@ -344,5 +385,128 @@ func TestInitSkippedKeyWritesPlaceholder(t *testing.T) {
 	output := buf.String()
 	if !strings.Contains(output, "add your ANTHROPIC_API_KEY") {
 		t.Errorf("expected instruction to add key, got: %s", output)
+	}
+}
+
+// --- Confirmation prompt tests ---
+
+func TestInitConfirmationListsFilesAndShowsTip(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "paper.pdf"), []byte("pdf"), 0644)
+	os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("notes"), 0644)
+
+	var buf bytes.Buffer
+	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"), fakeLineReader("y"), false)
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Files to move into raw/:") {
+		t.Errorf("expected file listing header, got: %s", output)
+	}
+	if !strings.Contains(output, "paper.pdf") {
+		t.Errorf("expected paper.pdf in listing, got: %s", output)
+	}
+	if !strings.Contains(output, "notes.txt") {
+		t.Errorf("expected notes.txt in listing, got: %s", output)
+	}
+	if !strings.Contains(output, "Tip: add a .researchignore file to exclude files from adoption.") {
+		t.Errorf("expected .researchignore tip, got: %s", output)
+	}
+	if !strings.Contains(output, "Proceed? [y/N]") {
+		t.Errorf("expected confirmation prompt, got: %s", output)
+	}
+}
+
+func TestInitConfirmationAbortsOnNo(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "paper.pdf"), []byte("pdf"), 0644)
+
+	var buf bytes.Buffer
+	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"), fakeLineReader("n"), false)
+	if err != nil {
+		t.Fatalf("expected no error on abort, got: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Aborted. No files were moved.") {
+		t.Errorf("expected abort message, got: %s", output)
+	}
+
+	// File should NOT have been moved
+	if _, err := os.Stat(filepath.Join(dir, "paper.pdf")); err != nil {
+		t.Error("paper.pdf should still be in root after abort")
+	}
+	// raw/ should NOT exist
+	if _, err := os.Stat(filepath.Join(dir, "raw")); err == nil {
+		t.Error("raw/ should not be created after abort")
+	}
+}
+
+func TestInitConfirmationAbortsOnEmptyInput(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "paper.pdf"), []byte("pdf"), 0644)
+
+	var buf bytes.Buffer
+	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"), fakeLineReader(""), false)
+	if err != nil {
+		t.Fatalf("expected no error on empty input, got: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Aborted. No files were moved.") {
+		t.Errorf("expected abort message on empty input, got: %s", output)
+	}
+
+	// File should still be in root
+	if _, err := os.Stat(filepath.Join(dir, "paper.pdf")); err != nil {
+		t.Error("paper.pdf should still be in root after empty-input abort")
+	}
+}
+
+func TestInitConfirmationProceedsOnY(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "paper.pdf"), []byte("pdf"), 0644)
+
+	var buf bytes.Buffer
+	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"), fakeLineReader("Y"), false)
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	// File should be moved
+	if _, err := os.Stat(filepath.Join(dir, "raw", "paper.pdf")); err != nil {
+		t.Error("expected paper.pdf in raw/ after confirming with Y")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "paper.pdf")); err == nil {
+		t.Error("paper.pdf should not be in root after confirming")
+	}
+}
+
+func TestInitNoInputSkipsConfirmation(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "paper.pdf"), []byte("pdf"), 0644)
+
+	var buf bytes.Buffer
+	// readLine is nil — should never be called with noInput=true
+	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"), nil, true)
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	output := buf.String()
+	// Should NOT contain the confirmation prompt
+	if strings.Contains(output, "Proceed? [y/N]") {
+		t.Errorf("should not prompt when --no-input is set, got: %s", output)
+	}
+	// File should be moved
+	if _, err := os.Stat(filepath.Join(dir, "raw", "paper.pdf")); err != nil {
+		t.Error("expected paper.pdf in raw/ with --no-input")
 	}
 }

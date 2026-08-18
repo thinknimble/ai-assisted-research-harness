@@ -7,12 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	ignore "github.com/sabhiram/go-gitignore"
 )
 
 //go:embed doc-template.yaml
 var embeddedDocTemplate string
 
-func runInit(args []string, stdout io.Writer, readKey func() (string, error)) error {
+func runInit(args []string, stdout io.Writer, readKey func() (string, error), readLine func() (string, error), noInput bool) error {
 	target := "."
 	if len(args) > 0 && args[0] != "" {
 		target = args[0]
@@ -41,27 +43,64 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error)) er
 		if hasRaw && hasFormatted {
 			existingResearchDir = true
 		} else {
-			// Directory has files but no research structure — adopt them into raw/
-			if err := os.MkdirAll(filepath.Join(absTarget, "raw"), 0755); err != nil {
-				return fmt.Errorf("failed to create raw/: %w", err)
+			// Load .researchignore if present
+			var gi *ignore.GitIgnore
+			ignorePath := filepath.Join(absTarget, ".researchignore")
+			if compiled, err := ignore.CompileIgnoreFile(ignorePath); err == nil {
+				gi = compiled
 			}
-			moved := 0
+
+			// Collect files to adopt
+			var filesToMove []string
 			for _, e := range entries {
-				if e.Name() == "raw" || e.Name() == "formatted" || e.Name() == "output" {
+				name := e.Name()
+				if name == "raw" || name == "formatted" || name == "output" || name == ".researchignore" {
 					continue
 				}
-				oldPath := filepath.Join(absTarget, e.Name())
-				newPath := filepath.Join(absTarget, "raw", e.Name())
-				if err := os.Rename(oldPath, newPath); err != nil {
-					return fmt.Errorf("failed to move %s to raw/: %w", e.Name(), err)
+				if gi != nil && gi.MatchesPath(name) {
+					continue
 				}
-				moved++
+				filesToMove = append(filesToMove, name)
 			}
-			if err := os.MkdirAll(filepath.Join(absTarget, "formatted"), 0755); err != nil {
-				return fmt.Errorf("failed to create formatted/: %w", err)
+
+			if len(filesToMove) > 0 {
+				// List files and ask for confirmation
+				fmt.Fprintln(stdout, "Files to move into raw/:")
+				for _, name := range filesToMove {
+					fmt.Fprintf(stdout, "  %s\n", name)
+				}
+				fmt.Fprintln(stdout, "Tip: add a .researchignore file to exclude files from adoption.")
+
+				if !noInput {
+					fmt.Fprint(stdout, "Proceed? [y/N] ")
+					response, err := readLine()
+					if err != nil {
+						return fmt.Errorf("failed to read input: %w", err)
+					}
+					response = strings.TrimSpace(response)
+					if response != "y" && response != "Y" {
+						fmt.Fprintln(stdout, "Aborted. No files were moved.")
+						return nil
+					}
+				}
+
+				// Move files
+				if err := os.MkdirAll(filepath.Join(absTarget, "raw"), 0755); err != nil {
+					return fmt.Errorf("failed to create raw/: %w", err)
+				}
+				for _, name := range filesToMove {
+					oldPath := filepath.Join(absTarget, name)
+					newPath := filepath.Join(absTarget, "raw", name)
+					if err := os.Rename(oldPath, newPath); err != nil {
+						return fmt.Errorf("failed to move %s to raw/: %w", name, err)
+					}
+				}
+				if err := os.MkdirAll(filepath.Join(absTarget, "formatted"), 0755); err != nil {
+					return fmt.Errorf("failed to create formatted/: %w", err)
+				}
+				adoptedFiles = true
+				fmt.Fprintf(stdout, "Moved %d existing files into raw/\n", len(filesToMove))
 			}
-			adoptedFiles = true
-			fmt.Fprintf(stdout, "Moved %d existing files into raw/\n", moved)
 		}
 	}
 

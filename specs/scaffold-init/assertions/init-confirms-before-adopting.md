@@ -3,7 +3,7 @@ id: init-confirms-before-adopting
 parent: scaffold-init
 created: 2026-08-18T17:00:00Z
 priority: 1
-status: not_started
+status: done
 depends-on: init-adopts-existing-files
 ---
 
@@ -21,3 +21,5 @@ When `research-assistant init` detects files to move into `raw/`, it lists them 
 - Existing research directories (already have `raw/` + `formatted/`) skip the confirmation entirely — nothing is moved
 - Fresh empty directories skip the confirmation — nothing to move
 - Aborting prints a message like `Aborted. No files were moved.` and exits with code 0 (not an error)
+
+**Tests:** init_test.go (TestInitConfirmation*, TestInitNoInputSkipsConfirmation)

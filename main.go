@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,7 +53,20 @@ func main() {
 			b, err := term.ReadPassword(int(os.Stdin.Fd()))
 			return string(b), err
 		}
-		if err := runInit(os.Args[2:], os.Stdout, readKey); err != nil {
+		readLine := func() (string, error) {
+			scanner := bufio.NewScanner(os.Stdin)
+			if scanner.Scan() {
+				return scanner.Text(), nil
+			}
+			if err := scanner.Err(); err != nil {
+				return "", err
+			}
+			return "", io.EOF
+		}
+		initFlags := flag.NewFlagSet("init", flag.ExitOnError)
+		noInput := initFlags.Bool("no-input", false, "Skip confirmation prompts")
+		initFlags.Parse(os.Args[2:])
+		if err := runInit(initFlags.Args(), os.Stdout, readKey, readLine, *noInput); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
