@@ -5,24 +5,36 @@
 - **A computer** running macOS, Linux, or Windows
 - **An Anthropic API key** — this is what lets the assistant use Claude (the AI) to read and answer questions. You can get one at [console.anthropic.com](https://console.anthropic.com/)
 
-## Step 1: Download the tool
-
-Go to the [Releases page](https://github.com/thinknimble/ai-assisted-research-harness/releases) and download the right file for your system:
-
-| System | File |
-|---|---|
-| Mac (Apple Silicon) | `research-assistant-darwin-arm64` |
-| Mac (Intel) | `research-assistant-darwin-amd64` |
-| Linux | `research-assistant-linux-amd64` |
-| Windows | `research-assistant-windows-amd64.exe` |
-
-Rename the downloaded file to `research-assistant` (or `research-assistant.exe` on Windows) and put it somewhere convenient.
-
-On macOS or Linux, make it executable:
+## Quick install (macOS / Linux)
 
 ```bash
-chmod +x research-assistant
+curl -fsSL https://raw.githubusercontent.com/thinknimble/ai-assisted-research-harness/main/install.sh | sh
 ```
+
+The script detects your platform, downloads the latest release, and installs to `~/.local/bin` (override with `RESEARCH_INSTALL_DIR`). If `~/.local/bin` is not on your `PATH`, the script prints the exact line to add to your shell config. Verify:
+
+```bash
+research-assistant --help
+```
+
+### Windows (PowerShell)
+
+```powershell
+$arch = if ([System.Environment]::Is64BitOperatingSystem) { "amd64" } else { "arm64" }
+$url = "https://github.com/thinknimble/ai-assisted-research-harness/releases/latest/download/research-assistant-windows-${arch}.exe"
+Invoke-WebRequest -Uri $url -OutFile "$env:LOCALAPPDATA\Microsoft\WindowsApps\research-assistant.exe"
+```
+
+??? tip "Manual download"
+    Download the binary for your platform from the [Releases page](https://github.com/thinknimble/ai-assisted-research-harness/releases/latest):
+
+    | Platform              | Binary name                              |
+    |-----------------------|------------------------------------------|
+    | macOS (Apple Silicon) | `research-assistant-darwin-arm64`         |
+    | macOS (Intel)         | `research-assistant-darwin-amd64`         |
+    | Linux (x86_64)        | `research-assistant-linux-amd64`          |
+    | Linux (ARM)           | `research-assistant-linux-arm64`          |
+    | Windows (x86_64)      | `research-assistant-windows-amd64.exe`    |
 
 ??? tip "Building from source"
     If you have Go installed, you can build it yourself:
@@ -30,7 +42,7 @@ chmod +x research-assistant
     go build -o research-assistant .
     ```
 
-## Step 2: Create a research library
+## Create a research library
 
 Run the `init` command to set up a new research library. This creates the folder structure and prompts you for your API key:
 
@@ -110,7 +122,7 @@ Found existing research directory, registered as "existing-project"
 
 It won't overwrite your `doc-template.yaml` or `.env` if they already exist.
 
-## Step 3: Verify it works
+## Verify it works
 
 ```bash
 research-assistant --mode reception
@@ -127,13 +139,26 @@ Type your message, or 'quit' to exit.
 
 Type `quit` to exit. You're all set!
 
+## Updating
+
+```bash
+research-assistant update          # install latest
+research-assistant update --check  # preview without installing
+```
+
+`update` replaces the binary in place, so it needs write access to the install directory. The default install location (`~/.local/bin`) is user-owned, so updates just work. If the binary lives in a root-owned directory like `/usr/local/bin`, run `sudo research-assistant update`. To switch to sudo-free updates, reinstall to the default:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/thinknimble/ai-assisted-research-harness/main/install.sh | sh
+```
+
 ## Troubleshooting
 
 **"ANTHROPIC_API_KEY environment variable is required"**
 :   Your `.env` file is missing or the key is not set correctly. Make sure it contains `ANTHROPIC_API_KEY=sk-ant-...`
 
 **"command not found: research-assistant"**
-:   You need to use `./research-assistant` (with the `./` prefix), or move the tool to a directory in your PATH.
+:   `~/.local/bin` is not on your PATH. The install script prints the exact line to add — check its output above.
 
 **"permission denied"**
 :   On macOS or Linux, make the file executable:

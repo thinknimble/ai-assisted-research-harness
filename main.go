@@ -40,6 +40,25 @@ func loadEnv() {
 
 func main() {
 	// Handle subcommands before flag parsing
+	if len(os.Args) >= 2 && os.Args[1] == "version" {
+		fmt.Println(version)
+		return
+	}
+
+	if len(os.Args) >= 2 && os.Args[1] == "update" {
+		checkOnly := false
+		for _, arg := range os.Args[2:] {
+			if arg == "--check" {
+				checkOnly = true
+			}
+		}
+		if err := runUpdate(checkOnly); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if len(os.Args) >= 2 && os.Args[1] == "repos" {
 		if err := runRepos(os.Stdout); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -84,6 +103,8 @@ func main() {
 Commands:
   init [path]       Initialize a new research directory (default: current dir)
   repos             List registered research repos
+  update            Update to the latest version (--check to preview)
+  version           Print current version
 
 Options:
   --mode <backoffice|reception>   Run in the specified mode (required)
