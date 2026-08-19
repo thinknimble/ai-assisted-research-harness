@@ -25,6 +25,19 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error), re
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
+	// Write default .researchignore if it doesn't exist
+	researchIgnorePath := filepath.Join(absTarget, ".researchignore")
+	if _, err := os.Stat(researchIgnorePath); os.IsNotExist(err) {
+		// Ensure directory exists before writing
+		if err := os.MkdirAll(absTarget, 0755); err != nil {
+			return fmt.Errorf("failed to create target directory: %w", err)
+		}
+		defaultIgnore := ".DS_Store\nThumbs.db\n*.swp\n*~\n.env\n"
+		if err := os.WriteFile(researchIgnorePath, []byte(defaultIgnore), 0644); err != nil {
+			return fmt.Errorf("failed to write .researchignore: %w", err)
+		}
+	}
+
 	// Check if directory exists and has content
 	existingResearchDir := false
 	adoptedFiles := false
@@ -69,7 +82,7 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error), re
 				for _, name := range filesToMove {
 					fmt.Fprintf(stdout, "  %s\n", name)
 				}
-				fmt.Fprintln(stdout, "Tip: add a .researchignore file to exclude files from adoption.")
+				fmt.Fprintln(stdout, "Tip: edit .researchignore to customize which files are excluded from adoption.")
 
 				if !noInput {
 					fmt.Fprint(stdout, "Proceed? [y/N] ")

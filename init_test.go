@@ -388,6 +388,70 @@ func TestInitSkippedKeyWritesPlaceholder(t *testing.T) {
 	}
 }
 
+// --- .researchignore creation tests ---
+
+func TestInitCreatesDefaultResearchIgnore(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	target := filepath.Join(dir, "my-research")
+
+	var buf bytes.Buffer
+	if err := runInit([]string{target}, &buf, fakeKeyReader("sk-test"), nil, false); err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(target, ".researchignore"))
+	if err != nil {
+		t.Fatalf("expected .researchignore to exist: %v", err)
+	}
+
+	content := string(data)
+	for _, pattern := range []string{".DS_Store", "Thumbs.db", "*.swp", "*~", ".env"} {
+		if !strings.Contains(content, pattern) {
+			t.Errorf("expected .researchignore to contain %q, got: %s", pattern, content)
+		}
+	}
+}
+
+func TestInitDoesNotOverwriteExistingResearchIgnore(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	custom := "my-custom-pattern\n"
+	os.WriteFile(filepath.Join(dir, ".researchignore"), []byte(custom), 0644)
+	// Need a file to adopt so we go through the adoption path
+	os.WriteFile(filepath.Join(dir, "file.txt"), []byte("data"), 0644)
+
+	var buf bytes.Buffer
+	if err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"), nil, true); err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(dir, ".researchignore"))
+	if string(data) != custom {
+		t.Errorf(".researchignore was overwritten, got: %s", string(data))
+	}
+}
+
+func TestInitShowsEditTipWhenAdoptingFiles(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "paper.pdf"), []byte("pdf"), 0644)
+
+	var buf bytes.Buffer
+	err := runInit([]string{dir}, &buf, fakeKeyReader("sk-test"), nil, true)
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	output := buf.String()
+	if strings.Contains(output, "Tip: add a .researchignore") {
+		t.Error("should not show old 'add' tip")
+	}
+	if !strings.Contains(output, "Tip: edit .researchignore to customize which files are excluded from adoption.") {
+		t.Errorf("expected updated tip, got: %s", output)
+	}
+}
+
 // --- Confirmation prompt tests ---
 
 func TestInitConfirmationListsFilesAndShowsTip(t *testing.T) {
@@ -412,8 +476,8 @@ func TestInitConfirmationListsFilesAndShowsTip(t *testing.T) {
 	if !strings.Contains(output, "notes.txt") {
 		t.Errorf("expected notes.txt in listing, got: %s", output)
 	}
-	if !strings.Contains(output, "Tip: add a .researchignore file to exclude files from adoption.") {
-		t.Errorf("expected .researchignore tip, got: %s", output)
+	if !strings.Contains(output, "Tip: edit .researchignore to customize which files are excluded from adoption.") {
+		t.Errorf("expected updated .researchignore tip, got: %s", output)
 	}
 	if !strings.Contains(output, "Proceed? [y/N]") {
 		t.Errorf("expected confirmation prompt, got: %s", output)

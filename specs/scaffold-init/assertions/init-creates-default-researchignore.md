@@ -3,7 +3,7 @@ id: init-creates-default-researchignore
 parent: scaffold-init
 created: 2026-08-19T00:00:00Z
 priority: 1
-status: not_started
+status: done
 ---
 
 # Init Creates a Default .researchignore
