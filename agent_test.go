@@ -721,6 +721,93 @@ func TestOrphanedToolUsePreventedOnTruncation(t *testing.T) {
 	}
 }
 
+func TestToolUseStatusPrintsImmediatelyOnContentBlockStart(t *testing.T) {
+	// The "[calling <tool>...]" line should appear during streaming (from
+	// ContentBlockStartEvent), not after the full input JSON is assembled.
+	toolInput := json.RawMessage(`{"path":"raw/big-doc.md"}`)
+	callCount := 0
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(200)
+		callCount++
+		if callCount == 1 {
+			w.Write(sseToolUseResponse("write_text_file", "toolu_imm", toolInput))
+		} else {
+			w.Write(sseResponse([]string{"Done."}))
+		}
+	}))
+	defer server.Close()
+
+	client := anthropic.NewClient(
+		option.WithAPIKey("test-key"),
+		option.WithBaseURL(server.URL),
+	)
+
+	// Capture stderr
+	oldStderr := os.Stderr
+	stderrR, stderrW, _ := os.Pipe()
+	os.Stderr = stderrW
+
+	// Suppress stdout
+	oldStdout := os.Stdout
+	_, stdoutW, _ := os.Pipe()
+	os.Stdout = stdoutW
+
+	setup := ModeSetup{
+		SystemPrompt: "test",
+		Tools: []anthropic.ToolUnionParam{
+			{OfTool: &anthropic.ToolParam{
+				Name:        "write_text_file",
+				Description: anthropic.String("Write a file"),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: map[string]any{
+						"path": map[string]any{"type": "string"},
+					},
+				},
+			}},
+		},
+		HandleTool: func(name string, input json.RawMessage) (string, error) {
+			return "ok", nil
+		},
+	}
+	messages := []anthropic.MessageParam{
+		{
+			Role: anthropic.MessageParamRoleUser,
+			Content: []anthropic.ContentBlockParamUnion{
+				{OfText: &anthropic.TextBlockParam{Text: "write the file"}},
+			},
+		},
+	}
+
+	_, err := runToolLoop(client, "claude-sonnet-4-6-20250514", setup, &messages)
+
+	stderrW.Close()
+	stdoutW.Close()
+	os.Stderr = oldStderr
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var stderrBuf bytes.Buffer
+	stderrBuf.ReadFrom(stderrR)
+	stderrOutput := stderrBuf.String()
+
+	// The early "[calling write_text_file...]" line from streaming
+	if !strings.Contains(stderrOutput, "[calling write_text_file...]") {
+		t.Errorf("stderr should contain '[calling write_text_file...]', got: %q", stderrOutput)
+	}
+
+	// The "[calling ...]" line must appear before the "[done]" line
+	callingIdx := strings.Index(stderrOutput, "[calling write_text_file...]")
+	doneIdx := strings.Index(stderrOutput, "[done]")
+	if callingIdx >= doneIdx {
+		t.Errorf("[calling ...] should appear before [done], got: %q", stderrOutput)
+	}
+}
+
 func TestToolStatusLabel(t *testing.T) {
 	tests := []struct {
 		name     string

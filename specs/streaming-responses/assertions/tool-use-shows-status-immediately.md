@@ -3,7 +3,7 @@ id: tool-use-shows-status-immediately
 parent: streaming-responses
 created: 2026-08-26T00:00:00Z
 priority: 1
-status: not_started
+status: done
 ---
 
 # Tool-use status line prints as soon as the content block starts streaming

@@ -37,6 +37,11 @@ func sendMessageStreaming(client anthropic.Client, model string, setup ModeSetup
 		message.Accumulate(event)
 
 		switch evt := event.AsAny().(type) {
+		case anthropic.ContentBlockStartEvent:
+			if evt.ContentBlock.Type == "tool_use" {
+				tu := evt.ContentBlock.AsToolUse()
+				fmt.Fprintf(os.Stderr, "[calling %s...]\n", tu.Name)
+			}
 		case anthropic.ContentBlockDeltaEvent:
 			switch delta := evt.Delta.AsAny().(type) {
 			case anthropic.TextDelta:
