@@ -10,6 +10,11 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 )
 
+// currentRawFile holds the raw file path currently being processed in
+// backoffice mode. It is set before each tool-loop iteration in main.go
+// and read by handleBackofficeTool to record the mapping in the tracking DB.
+var currentRawFile string
+
 const backofficeSystemPrompt = `You are a document formatting assistant for a research knowledge base.
 
 Your job is to process raw research documents into formatted reference stubs.
@@ -160,6 +165,22 @@ func handleBackofficeTool(name string, input json.RawMessage) (string, error) {
 		}
 		if err := writeFile("formatted", params.Filename, params.Content); err != nil {
 			return "", fmt.Errorf("failed to write formatted/%s: %w", params.Filename, err)
+		}
+		formattedPath := filepath.Join("formatted", filepath.Base(params.Filename))
+		if currentRawFile != "" {
+			db, err := OpenTrackingDB(projectRoot)
+			if err != nil {
+				return "", fmt.Errorf("failed to open tracking DB: %w", err)
+			}
+			defer db.Close()
+			_, err = db.Exec(
+				`INSERT INTO processed_files (raw_path, formatted_path) VALUES (?, ?)
+				 ON CONFLICT(raw_path) DO UPDATE SET formatted_path = excluded.formatted_path, processed_at = CURRENT_TIMESTAMP`,
+				currentRawFile, formattedPath,
+			)
+			if err != nil {
+				return "", fmt.Errorf("failed to record mapping: %w", err)
+			}
 		}
 		return fmt.Sprintf("Written formatted/%s", params.Filename), nil
 

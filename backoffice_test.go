@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -57,6 +58,91 @@ func TestBackofficeAutoCreatesDBMatchingInit(t *testing.T) {
 		} else if got != wantType {
 			t.Errorf("column %q type mismatch: init=%q, backoffice=%q", col, wantType, got)
 		}
+	}
+}
+
+func TestWriteFormattedStubRecordsMapping(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "formatted"), 0755)
+
+	oldRoot := projectRoot
+	oldRawFile := currentRawFile
+	t.Cleanup(func() {
+		projectRoot = oldRoot
+		currentRawFile = oldRawFile
+	})
+	projectRoot = dir
+	currentRawFile = "raw/survey-webhooks/typeform-webhooks.md"
+
+	input := `{"filename":"typeform-webhooks.md","content":"---\ntitle: test\n---"}`
+	result, err := handleBackofficeTool("write_formatted_stub", []byte(input))
+	if err != nil {
+		t.Fatalf("handleBackofficeTool: %v", err)
+	}
+	if !strings.Contains(result, "formatted/typeform-webhooks.md") {
+		t.Fatalf("unexpected result: %s", result)
+	}
+
+	db, err := OpenTrackingDB(dir)
+	if err != nil {
+		t.Fatalf("OpenTrackingDB: %v", err)
+	}
+	defer db.Close()
+
+	var formattedPath string
+	err = db.QueryRow("SELECT formatted_path FROM processed_files WHERE raw_path = ?", currentRawFile).Scan(&formattedPath)
+	if err != nil {
+		t.Fatalf("query processed_files: %v", err)
+	}
+	if formattedPath != "formatted/typeform-webhooks.md" {
+		t.Errorf("got formatted_path=%q, want %q", formattedPath, "formatted/typeform-webhooks.md")
+	}
+}
+
+func TestWriteFormattedStubUpsertsMapping(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "formatted"), 0755)
+
+	oldRoot := projectRoot
+	oldRawFile := currentRawFile
+	t.Cleanup(func() {
+		projectRoot = oldRoot
+		currentRawFile = oldRawFile
+	})
+	projectRoot = dir
+	currentRawFile = "raw/doc.md"
+
+	// First write
+	input := `{"filename":"doc.md","content":"v1"}`
+	if _, err := handleBackofficeTool("write_formatted_stub", []byte(input)); err != nil {
+		t.Fatalf("first write: %v", err)
+	}
+
+	// Second write with same raw path — should UPSERT
+	input2 := `{"filename":"doc-v2.md","content":"v2"}`
+	if _, err := handleBackofficeTool("write_formatted_stub", []byte(input2)); err != nil {
+		t.Fatalf("second write: %v", err)
+	}
+
+	db, err := OpenTrackingDB(dir)
+	if err != nil {
+		t.Fatalf("OpenTrackingDB: %v", err)
+	}
+	defer db.Close()
+
+	var formattedPath string
+	err = db.QueryRow("SELECT formatted_path FROM processed_files WHERE raw_path = ?", "raw/doc.md").Scan(&formattedPath)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if formattedPath != "formatted/doc-v2.md" {
+		t.Errorf("got %q, want %q — UPSERT should have replaced the old path", formattedPath, "formatted/doc-v2.md")
+	}
+
+	var count int
+	db.QueryRow("SELECT COUNT(*) FROM processed_files WHERE raw_path = ?", "raw/doc.md").Scan(&count)
+	if count != 1 {
+		t.Errorf("expected 1 row for raw_path, got %d", count)
 	}
 }
 

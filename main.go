@@ -168,6 +168,7 @@ Options:
 		failed := 0
 		for i, file := range unprocessed {
 			fmt.Printf("[%d/%d] %s\n", i+1, len(unprocessed), file)
+			currentRawFile = file
 			prompt := fmt.Sprintf("Read the raw file at %q and create a formatted stub for it.", file)
 			messages := []anthropic.MessageParam{{
 				Role: anthropic.MessageParamRoleUser,
