@@ -3,7 +3,7 @@ id: write-file-creates-parent-dir
 parent: reception-write-tools
 created: 2026-08-26T00:00:00Z
 priority: 1
-status: not_started
+status: done
 ---
 
 # writeFile creates the target directory if it does not exist

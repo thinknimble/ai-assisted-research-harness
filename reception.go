@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -216,6 +217,9 @@ func handleWriteSpreadsheet(input json.RawMessage) (string, error) {
 	}
 
 	dest := filepath.Join(projectRoot, "output", filepath.Base(params.Filename))
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		return "", fmt.Errorf("failed to create output directory: %w", err)
+	}
 	if err := f.SaveAs(dest); err != nil {
 		return "", fmt.Errorf("failed to save xlsx: %w", err)
 	}

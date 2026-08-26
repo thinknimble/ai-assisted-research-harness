@@ -169,6 +169,72 @@ func TestWriteTextFileTool(t *testing.T) {
 	})
 }
 
+func TestWriteToolsCreateMissingOutputDir(t *testing.T) {
+	tmp := t.TempDir()
+	origRoot := projectRoot
+	projectRoot = tmp
+	t.Cleanup(func() { projectRoot = origRoot })
+	// Intentionally do NOT create output/ — it must be created automatically.
+
+	t.Run("write_text_file creates output dir", func(t *testing.T) {
+		input := map[string]any{
+			"filename": "notes.md",
+			"content":  "hello",
+		}
+		raw, _ := json.Marshal(input)
+		result, err := handleReceptionTool("write_text_file", raw)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != "Written output/notes.md" {
+			t.Errorf("got %q", result)
+		}
+		data, _ := os.ReadFile(filepath.Join(tmp, "output", "notes.md"))
+		if string(data) != "hello" {
+			t.Errorf("content = %q", string(data))
+		}
+	})
+
+	// Remove output/ again so spreadsheet test starts fresh
+	os.RemoveAll(filepath.Join(tmp, "output"))
+
+	t.Run("write_spreadsheet creates output dir", func(t *testing.T) {
+		input := map[string]any{
+			"filename": "data.xlsx",
+			"headers":  []string{"A"},
+			"rows":     [][]string{{"1"}},
+		}
+		raw, _ := json.Marshal(input)
+		result, err := handleReceptionTool("write_spreadsheet", raw)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result != "Written output/data.xlsx (1 rows)" {
+			t.Errorf("got %q", result)
+		}
+		if _, err := os.Stat(filepath.Join(tmp, "output", "data.xlsx")); err != nil {
+			t.Errorf("xlsx file not created: %v", err)
+		}
+	})
+}
+
+func TestWriteFileSandboxesTraversalAttempts(t *testing.T) {
+	tmp := t.TempDir()
+	origRoot := projectRoot
+	projectRoot = tmp
+	t.Cleanup(func() { projectRoot = origRoot })
+
+	// filepath.Base strips directory traversal, so the file lands safely in output/
+	err := writeFile("output", "../../../etc/passwd", "safe")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// File should be in output/passwd, not /etc/passwd
+	if _, err := os.Stat(filepath.Join(tmp, "output", "passwd")); err != nil {
+		t.Errorf("file should exist in sandbox: %v", err)
+	}
+}
+
 func TestSetupReceptionIncludesWriteTextFile(t *testing.T) {
 	setup := setupReception()
 

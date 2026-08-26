@@ -390,5 +390,8 @@ func writeFile(dir, filename, content string) error {
 	if !strings.HasPrefix(cleaned, filepath.Join(projectRoot, dir)) {
 		return os.ErrPermission
 	}
+	if err := os.MkdirAll(filepath.Dir(cleaned), 0755); err != nil {
+		return err
+	}
 	return os.WriteFile(cleaned, []byte(content), 0644)
 }
