@@ -69,8 +69,75 @@ func toolStatusLabel(name string, input json.RawMessage) string {
 	return fmt.Sprintf("using %s...", name)
 }
 
+// healOrphanedToolUse scans the message history for assistant messages that
+// contain tool_use blocks without a corresponding tool_result in the next user
+// message. For each orphan, a synthetic tool_result (is_error: true) is
+// injected so the API call won't fail with a 400.
+func healOrphanedToolUse(messages *[]anthropic.MessageParam) {
+	msgs := *messages
+	for i := 0; i < len(msgs); i++ {
+		if msgs[i].Role != anthropic.MessageParamRoleAssistant {
+			continue
+		}
+
+		// Collect tool_use IDs from this assistant message.
+		var toolUseIDs []string
+		for _, block := range msgs[i].Content {
+			if block.OfToolUse != nil {
+				toolUseIDs = append(toolUseIDs, block.OfToolUse.ID)
+			}
+		}
+		if len(toolUseIDs) == 0 {
+			continue
+		}
+
+		// Check which IDs are answered in the next user message.
+		answered := make(map[string]bool)
+		if i+1 < len(msgs) && msgs[i+1].Role == anthropic.MessageParamRoleUser {
+			for _, block := range msgs[i+1].Content {
+				if block.OfToolResult != nil {
+					answered[block.OfToolResult.ToolUseID] = true
+				}
+			}
+		}
+
+		// Build synthetic results for orphans.
+		var orphanResults []anthropic.ContentBlockParamUnion
+		for _, id := range toolUseIDs {
+			if !answered[id] {
+				orphanResults = append(orphanResults, anthropic.ContentBlockParamUnion{
+					OfToolResult: &anthropic.ToolResultBlockParam{
+						ToolUseID: id,
+						IsError:   anthropic.Bool(true),
+						Content: []anthropic.ToolResultBlockParamContentUnion{
+							{OfText: &anthropic.TextBlockParam{Text: "Tool call was not completed"}},
+						},
+					},
+				})
+			}
+		}
+		if len(orphanResults) == 0 {
+			continue
+		}
+
+		// Inject: either append to existing next-user-message or insert a new one.
+		if i+1 < len(msgs) && msgs[i+1].Role == anthropic.MessageParamRoleUser {
+			msgs[i+1].Content = append(msgs[i+1].Content, orphanResults...)
+		} else {
+			// Insert a new user message after the assistant message.
+			newMsg := anthropic.MessageParam{
+				Role:    anthropic.MessageParamRoleUser,
+				Content: orphanResults,
+			}
+			msgs = append(msgs[:i+1], append([]anthropic.MessageParam{newMsg}, msgs[i+1:]...)...)
+			*messages = msgs
+		}
+	}
+}
+
 func runToolLoop(client anthropic.Client, model string, setup ModeSetup, messages *[]anthropic.MessageParam) (string, error) {
 	for {
+		healOrphanedToolUse(messages)
 		resp, err := sendMessageStreaming(client, model, setup, *messages)
 		if err != nil {
 			return "", fmt.Errorf("api error: %w", err)

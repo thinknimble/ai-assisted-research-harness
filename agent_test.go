@@ -387,6 +387,201 @@ func TestToolResultErrorPrintsErrorToStderr(t *testing.T) {
 	}
 }
 
+func TestHealOrphanedToolUse(t *testing.T) {
+	t.Run("patches orphaned tool_use with synthetic error result", func(t *testing.T) {
+		messages := []anthropic.MessageParam{
+			{
+				Role: anthropic.MessageParamRoleUser,
+				Content: []anthropic.ContentBlockParamUnion{
+					{OfText: &anthropic.TextBlockParam{Text: "hi"}},
+				},
+			},
+			{
+				Role: anthropic.MessageParamRoleAssistant,
+				Content: []anthropic.ContentBlockParamUnion{
+					{OfToolUse: &anthropic.ToolUseBlockParam{ID: "toolu_orphan", Name: "write_file", Input: map[string]any{}}},
+				},
+			},
+			// No user message with tool_result follows — this is the orphan.
+		}
+
+		healOrphanedToolUse(&messages)
+
+		// A new user message should have been inserted with a synthetic tool_result.
+		if len(messages) != 3 {
+			t.Fatalf("expected 3 messages, got %d", len(messages))
+		}
+		userMsg := messages[2]
+		if userMsg.Role != anthropic.MessageParamRoleUser {
+			t.Fatalf("expected user message, got %s", userMsg.Role)
+		}
+		if len(userMsg.Content) != 1 {
+			t.Fatalf("expected 1 content block, got %d", len(userMsg.Content))
+		}
+		tr := userMsg.Content[0].OfToolResult
+		if tr == nil {
+			t.Fatal("expected OfToolResult, got nil")
+		}
+		if tr.ToolUseID != "toolu_orphan" {
+			t.Errorf("tool_use_id = %q, want %q", tr.ToolUseID, "toolu_orphan")
+		}
+		if !tr.IsError.Valid() || !tr.IsError.Value {
+			t.Error("expected is_error = true")
+		}
+	})
+
+	t.Run("idempotent on valid history", func(t *testing.T) {
+		messages := []anthropic.MessageParam{
+			{
+				Role: anthropic.MessageParamRoleUser,
+				Content: []anthropic.ContentBlockParamUnion{
+					{OfText: &anthropic.TextBlockParam{Text: "hi"}},
+				},
+			},
+			{
+				Role: anthropic.MessageParamRoleAssistant,
+				Content: []anthropic.ContentBlockParamUnion{
+					{OfToolUse: &anthropic.ToolUseBlockParam{ID: "toolu_ok", Name: "read_file", Input: map[string]any{}}},
+				},
+			},
+			{
+				Role: anthropic.MessageParamRoleUser,
+				Content: []anthropic.ContentBlockParamUnion{
+					{OfToolResult: &anthropic.ToolResultBlockParam{
+						ToolUseID: "toolu_ok",
+						Content: []anthropic.ToolResultBlockParamContentUnion{
+							{OfText: &anthropic.TextBlockParam{Text: "contents"}},
+						},
+					}},
+				},
+			},
+		}
+
+		before := len(messages)
+		contentBefore := len(messages[2].Content)
+		healOrphanedToolUse(&messages)
+
+		if len(messages) != before {
+			t.Errorf("message count changed: %d -> %d", before, len(messages))
+		}
+		if len(messages[2].Content) != contentBefore {
+			t.Errorf("content count changed: %d -> %d", contentBefore, len(messages[2].Content))
+		}
+	})
+
+	t.Run("appends to existing user message when partially answered", func(t *testing.T) {
+		messages := []anthropic.MessageParam{
+			{
+				Role: anthropic.MessageParamRoleUser,
+				Content: []anthropic.ContentBlockParamUnion{
+					{OfText: &anthropic.TextBlockParam{Text: "do both"}},
+				},
+			},
+			{
+				Role: anthropic.MessageParamRoleAssistant,
+				Content: []anthropic.ContentBlockParamUnion{
+					{OfToolUse: &anthropic.ToolUseBlockParam{ID: "toolu_a", Name: "read_file", Input: map[string]any{}}},
+					{OfToolUse: &anthropic.ToolUseBlockParam{ID: "toolu_b", Name: "write_file", Input: map[string]any{}}},
+				},
+			},
+			{
+				Role: anthropic.MessageParamRoleUser,
+				Content: []anthropic.ContentBlockParamUnion{
+					{OfToolResult: &anthropic.ToolResultBlockParam{
+						ToolUseID: "toolu_a",
+						Content: []anthropic.ToolResultBlockParamContentUnion{
+							{OfText: &anthropic.TextBlockParam{Text: "ok"}},
+						},
+					}},
+					// toolu_b is missing — orphaned
+				},
+			},
+		}
+
+		healOrphanedToolUse(&messages)
+
+		// Should still be 3 messages, but user message now has 2 blocks.
+		if len(messages) != 3 {
+			t.Fatalf("expected 3 messages, got %d", len(messages))
+		}
+		if len(messages[2].Content) != 2 {
+			t.Fatalf("expected 2 content blocks in user message, got %d", len(messages[2].Content))
+		}
+		tr := messages[2].Content[1].OfToolResult
+		if tr == nil || tr.ToolUseID != "toolu_b" {
+			t.Errorf("expected synthetic result for toolu_b")
+		}
+	})
+}
+
+func TestHealOrphanedToolUseIntegration(t *testing.T) {
+	// A pre-corrupted history with an orphaned tool_use should not cause a 400
+	// because healOrphanedToolUse patches it before the API call.
+	callCount := 0
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(200)
+		callCount++
+		w.Write(sseResponse([]string{"Recovered!"}))
+	}))
+	defer server.Close()
+
+	client := anthropic.NewClient(
+		option.WithAPIKey("test-key"),
+		option.WithBaseURL(server.URL),
+	)
+
+	// Suppress stdout/stderr
+	oldStdout := os.Stdout
+	_, stdoutW, _ := os.Pipe()
+	os.Stdout = stdoutW
+	oldStderr := os.Stderr
+	_, stderrW, _ := os.Pipe()
+	os.Stderr = stderrW
+
+	// Build a corrupted history: assistant tool_use with no tool_result.
+	messages := []anthropic.MessageParam{
+		{
+			Role: anthropic.MessageParamRoleUser,
+			Content: []anthropic.ContentBlockParamUnion{
+				{OfText: &anthropic.TextBlockParam{Text: "write a file"}},
+			},
+		},
+		{
+			Role: anthropic.MessageParamRoleAssistant,
+			Content: []anthropic.ContentBlockParamUnion{
+				{OfToolUse: &anthropic.ToolUseBlockParam{ID: "toolu_corrupt", Name: "write_file", Input: map[string]any{}}},
+			},
+		},
+		// Missing tool_result — this is the corruption.
+		{
+			Role: anthropic.MessageParamRoleUser,
+			Content: []anthropic.ContentBlockParamUnion{
+				{OfText: &anthropic.TextBlockParam{Text: "continue please"}},
+			},
+		},
+	}
+
+	setup := ModeSetup{SystemPrompt: "test", Tools: nil, HandleTool: nil}
+	text, err := runToolLoop(client, "claude-sonnet-4-6-20250514", setup, &messages)
+
+	stdoutW.Close()
+	stderrW.Close()
+	os.Stdout = oldStdout
+	os.Stderr = oldStderr
+
+	if err != nil {
+		t.Fatalf("expected no error after self-heal, got: %v", err)
+	}
+	if text != "Recovered!" {
+		t.Errorf("text = %q, want %q", text, "Recovered!")
+	}
+	if callCount != 1 {
+		t.Errorf("expected 1 API call, got %d", callCount)
+	}
+}
+
 func TestToolStatusLabel(t *testing.T) {
 	tests := []struct {
 		name     string

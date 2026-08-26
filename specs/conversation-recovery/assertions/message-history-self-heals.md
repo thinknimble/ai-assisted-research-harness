@@ -3,7 +3,7 @@ id: message-history-self-heals
 parent: conversation-recovery
 created: 2026-08-26T00:00:00Z
 priority: 1
-status: not_started
+status: done
 ---
 
 # Message history self-heals orphaned tool_use blocks before each API call
