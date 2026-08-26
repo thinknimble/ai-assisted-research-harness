@@ -582,6 +582,145 @@ func TestHealOrphanedToolUseIntegration(t *testing.T) {
 	}
 }
 
+// sseTruncatedToolUseResponse builds an SSE stream where the assistant starts
+// a tool_use block but the response is truncated (stop_reason "max_tokens").
+func sseTruncatedToolUseResponse(toolName, toolID string, toolInput json.RawMessage) []byte {
+	var buf bytes.Buffer
+
+	buf.WriteString("event: message_start\n")
+	buf.WriteString(`data: {"type":"message_start","message":{"id":"msg_trunc","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-6-20250514","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":0}}}`)
+	buf.WriteString("\n\n")
+
+	buf.WriteString("event: content_block_start\n")
+	fmt.Fprintf(&buf, `data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":%q,"name":%q,"input":{}}}`, toolID, toolName)
+	buf.WriteString("\n\n")
+
+	inputStr := string(toolInput)
+	buf.WriteString("event: content_block_delta\n")
+	fmt.Fprintf(&buf, `data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":%q}}`, inputStr)
+	buf.WriteString("\n\n")
+
+	buf.WriteString("event: content_block_stop\n")
+	buf.WriteString(`data: {"type":"content_block_stop","index":0}`)
+	buf.WriteString("\n\n")
+
+	buf.WriteString("event: message_delta\n")
+	buf.WriteString(`data: {"type":"message_delta","delta":{"stop_reason":"max_tokens","stop_sequence":null},"usage":{"output_tokens":4096}}`)
+	buf.WriteString("\n\n")
+
+	buf.WriteString("event: message_stop\n")
+	buf.WriteString(`data: {"type":"message_stop"}`)
+	buf.WriteString("\n\n")
+
+	return buf.Bytes()
+}
+
+func TestOrphanedToolUsePreventedOnTruncation(t *testing.T) {
+	// Simulate: first call returns tool_use with max_tokens stop_reason,
+	// second call returns normal text. The synthetic tool_result should
+	// prevent a 400 on the second call.
+	toolInput := json.RawMessage(`{"path":"big-file.md"}`)
+	callCount := 0
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(200)
+		callCount++
+		if callCount == 1 {
+			w.Write(sseTruncatedToolUseResponse("read_file", "toolu_trunc1", toolInput))
+		} else {
+			w.Write(sseResponse([]string{"Continuing after truncation."}))
+		}
+	}))
+	defer server.Close()
+
+	client := anthropic.NewClient(
+		option.WithAPIKey("test-key"),
+		option.WithBaseURL(server.URL),
+	)
+
+	// Suppress stdout/stderr
+	oldStdout := os.Stdout
+	_, stdoutW, _ := os.Pipe()
+	os.Stdout = stdoutW
+	oldStderr := os.Stderr
+	_, stderrW, _ := os.Pipe()
+	os.Stderr = stderrW
+
+	setup := ModeSetup{
+		SystemPrompt: "test",
+		Tools: []anthropic.ToolUnionParam{
+			{OfTool: &anthropic.ToolParam{
+				Name:        "read_file",
+				Description: anthropic.String("Read a file"),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: map[string]any{
+						"path": map[string]any{"type": "string"},
+					},
+				},
+			}},
+		},
+		HandleTool: func(name string, input json.RawMessage) (string, error) {
+			t.Fatal("HandleTool should not be called for truncated tool_use")
+			return "", nil
+		},
+	}
+	messages := []anthropic.MessageParam{
+		{
+			Role: anthropic.MessageParamRoleUser,
+			Content: []anthropic.ContentBlockParamUnion{
+				{OfText: &anthropic.TextBlockParam{Text: "read the big file"}},
+			},
+		},
+	}
+
+	text, err := runToolLoop(client, "claude-sonnet-4-6-20250514", setup, &messages)
+
+	stdoutW.Close()
+	stderrW.Close()
+	os.Stdout = oldStdout
+	os.Stderr = oldStderr
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// The conversation should have continued after truncation
+	if text != "Continuing after truncation." {
+		t.Errorf("text = %q, want %q", text, "Continuing after truncation.")
+	}
+
+	// Should have made 2 API calls (truncated + retry)
+	if callCount != 2 {
+		t.Errorf("expected 2 API calls, got %d", callCount)
+	}
+
+	// Verify synthetic tool_result was injected in the message history.
+	// Messages should be: [user, assistant(tool_use), user(synthetic tool_result), assistant(text)]
+	if len(messages) != 4 {
+		t.Fatalf("expected 4 messages, got %d", len(messages))
+	}
+
+	// The synthetic result should be in messages[2]
+	syntheticMsg := messages[2]
+	if syntheticMsg.Role != anthropic.MessageParamRoleUser {
+		t.Fatalf("expected user message at index 2, got %s", syntheticMsg.Role)
+	}
+	if len(syntheticMsg.Content) != 1 {
+		t.Fatalf("expected 1 content block in synthetic message, got %d", len(syntheticMsg.Content))
+	}
+	tr := syntheticMsg.Content[0].OfToolResult
+	if tr == nil {
+		t.Fatal("expected OfToolResult in synthetic message")
+	}
+	if tr.ToolUseID != "toolu_trunc1" {
+		t.Errorf("synthetic tool_use_id = %q, want %q", tr.ToolUseID, "toolu_trunc1")
+	}
+	if !tr.IsError.Valid() || !tr.IsError.Value {
+		t.Error("expected synthetic result to have is_error = true")
+	}
+}
+
 func TestToolStatusLabel(t *testing.T) {
 	tests := []struct {
 		name     string

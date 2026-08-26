@@ -146,6 +146,32 @@ func runToolLoop(client anthropic.Client, model string, setup ModeSetup, message
 		*messages = append(*messages, resp.ToParam())
 
 		if resp.StopReason != "tool_use" {
+			// If the response contains tool_use blocks despite a non-tool_use
+			// stop_reason (e.g. max_tokens), inject synthetic error results so
+			// the next API call doesn't get a 400 for orphaned tool_use.
+			var syntheticResults []anthropic.ContentBlockParamUnion
+			for _, block := range resp.Content {
+				if block.Type == "tool_use" {
+					tu := block.AsToolUse()
+					syntheticResults = append(syntheticResults, anthropic.ContentBlockParamUnion{
+						OfToolResult: &anthropic.ToolResultBlockParam{
+							ToolUseID: tu.ID,
+							IsError:   anthropic.Bool(true),
+							Content: []anthropic.ToolResultBlockParamContentUnion{
+								{OfText: &anthropic.TextBlockParam{Text: "Tool call interrupted — response was truncated"}},
+							},
+						},
+					})
+				}
+			}
+			if len(syntheticResults) > 0 {
+				*messages = append(*messages, anthropic.MessageParam{
+					Role:    anthropic.MessageParamRoleUser,
+					Content: syntheticResults,
+				})
+				continue // loop back so the LLM can retry or respond
+			}
+
 			var text string
 			for _, block := range resp.Content {
 				if block.Type == "text" {
