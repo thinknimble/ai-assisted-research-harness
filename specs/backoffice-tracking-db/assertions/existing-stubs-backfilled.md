@@ -3,7 +3,7 @@ id: existing-stubs-backfilled
 parent: backoffice-tracking-db
 created: 2026-08-26T00:00:00Z
 priority: 2
-status: not_started
+status: done
 depends-on: tracking-db-exists
 ---
 
@@ -19,3 +19,5 @@ Research repos that already have formatted stubs but no DB entries get migrated 
 - Stubs without a `path` field or whose `path` points to a non-existent raw file are skipped (logged to stderr as a warning)
 - Backfill runs only once — subsequent runs see a non-empty table and skip it
 - A test: a repo with 3 formatted stubs and an empty DB has 3 rows in `processed_files` after backfill
+
+**Tests:** backfill_test.go

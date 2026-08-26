@@ -154,6 +154,13 @@ Options:
 		}
 		defer tdb.Close()
 
+		if n, err := BackfillFromStubs(tdb, projectRoot, os.Stderr); err != nil {
+			fmt.Fprintf(os.Stderr, "Error backfilling existing stubs: %s\n", err)
+			os.Exit(1)
+		} else if n > 0 {
+			fmt.Printf("Backfilled %d existing stub(s) into tracking DB.\n", n)
+		}
+
 		unprocessed, err := unprocessedRawFiles(tdb)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error scanning files: %s\n", err)
