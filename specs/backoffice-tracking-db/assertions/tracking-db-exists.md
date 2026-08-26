@@ -3,7 +3,7 @@ id: tracking-db-exists
 parent: backoffice-tracking-db
 created: 2026-08-26T00:00:00Z
 priority: 1
-status: not_started
+status: done
 ---
 
 # Each research repo has a .research-assistant.db SQLite file

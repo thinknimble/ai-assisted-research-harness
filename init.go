@@ -32,7 +32,7 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error), re
 		if err := os.MkdirAll(absTarget, 0755); err != nil {
 			return fmt.Errorf("failed to create target directory: %w", err)
 		}
-		defaultIgnore := ".DS_Store\nThumbs.db\n*.swp\n*~\n.env\n"
+		defaultIgnore := ".DS_Store\nThumbs.db\n*.swp\n*~\n.env\n.research-assistant.db\n"
 		if err := os.WriteFile(researchIgnorePath, []byte(defaultIgnore), 0644); err != nil {
 			return fmt.Errorf("failed to write .researchignore: %w", err)
 		}
@@ -165,6 +165,13 @@ func runInit(args []string, stdout io.Writer, readKey func() (string, error), re
 			}
 		}
 	}
+
+	// Create or open the tracking database (idempotent)
+	tdb, err := OpenTrackingDB(absTarget)
+	if err != nil {
+		return fmt.Errorf("failed to create tracking database: %w", err)
+	}
+	tdb.Close()
 
 	// Register repo in global config
 	cfg, err := LoadGlobalConfig()
