@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -198,31 +199,36 @@ func handleBackofficeTool(name string, input json.RawMessage) (string, error) {
 	}
 }
 
-// unprocessedRawFiles returns raw files that have no corresponding stub in formatted/.
-func unprocessedRawFiles() ([]string, error) {
+// unprocessedRawFiles returns raw files that have no entry in the tracking DB's
+// processed_files table. This replaces the old basename-matching approach.
+func unprocessedRawFiles(db *sql.DB) ([]string, error) {
 	rawFiles, err := listDir("raw")
 	if err != nil {
 		return nil, err
 	}
-	formattedFiles, err := listDir("formatted")
-	if err != nil {
-		// formatted/ might not have any files yet
-		formattedFiles = nil
-	}
 
-	// Build set of formatted basenames (without extension)
-	formattedSet := make(map[string]bool)
-	for _, f := range formattedFiles {
-		base := filepath.Base(f)
-		name := strings.TrimSuffix(base, filepath.Ext(base))
-		formattedSet[name] = true
+	// Query all processed raw paths into a set
+	rows, err := db.Query("SELECT raw_path FROM processed_files")
+	if err != nil {
+		return nil, fmt.Errorf("query processed_files: %w", err)
+	}
+	defer rows.Close()
+
+	processed := make(map[string]bool)
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, fmt.Errorf("scan raw_path: %w", err)
+		}
+		processed[p] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration: %w", err)
 	}
 
 	var unprocessed []string
 	for _, f := range rawFiles {
-		base := filepath.Base(f)
-		name := strings.TrimSuffix(base, filepath.Ext(base))
-		if !formattedSet[name] {
+		if !processed[f] {
 			unprocessed = append(unprocessed, f)
 		}
 	}

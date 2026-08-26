@@ -152,9 +152,9 @@ Options:
 			fmt.Fprintf(os.Stderr, "Error opening tracking database: %s\n", err)
 			os.Exit(1)
 		}
-		tdb.Close()
+		defer tdb.Close()
 
-		unprocessed, err := unprocessedRawFiles()
+		unprocessed, err := unprocessedRawFiles(tdb)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error scanning files: %s\n", err)
 			os.Exit(1)

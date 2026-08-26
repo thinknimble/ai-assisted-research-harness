@@ -146,6 +146,49 @@ func TestWriteFormattedStubUpsertsMapping(t *testing.T) {
 	}
 }
 
+func TestUnprocessedRawFilesUsesDB(t *testing.T) {
+	dir := t.TempDir()
+	oldRoot := projectRoot
+	t.Cleanup(func() { projectRoot = oldRoot })
+	projectRoot = dir
+
+	// Create raw/ with two files, one in a subdirectory
+	os.MkdirAll(filepath.Join(dir, "raw", "meetings"), 0755)
+	os.WriteFile(filepath.Join(dir, "raw", "meetings", "foo.md"), []byte("raw"), 0644)
+	os.WriteFile(filepath.Join(dir, "raw", "bar.md"), []byte("raw"), 0644)
+
+	// Create formatted/ with a stub that has a similar name to foo (but DB governs, not basename)
+	os.MkdirAll(filepath.Join(dir, "formatted"), 0755)
+	os.WriteFile(filepath.Join(dir, "formatted", "foo.md"), []byte("stub"), 0644)
+
+	db, err := OpenTrackingDB(dir)
+	if err != nil {
+		t.Fatalf("OpenTrackingDB: %v", err)
+	}
+	defer db.Close()
+
+	// Record that raw/meetings/foo.md was processed → mapped to formatted/meetings-foo.md
+	_, err = db.Exec(`INSERT INTO processed_files (raw_path, formatted_path) VALUES (?, ?)`,
+		"raw/meetings/foo.md", "formatted/meetings-foo.md")
+	if err != nil {
+		t.Fatalf("insert: %v", err)
+	}
+
+	unprocessed, err := unprocessedRawFiles(db)
+	if err != nil {
+		t.Fatalf("unprocessedRawFiles: %v", err)
+	}
+
+	// raw/meetings/foo.md has a DB entry → should NOT appear
+	// raw/bar.md has NO DB entry → should appear (even though formatted/foo.md exists)
+	if len(unprocessed) != 1 {
+		t.Fatalf("expected 1 unprocessed file, got %d: %v", len(unprocessed), unprocessed)
+	}
+	if unprocessed[0] != "raw/bar.md" {
+		t.Errorf("expected raw/bar.md, got %q", unprocessed[0])
+	}
+}
+
 func tableSchema(t *testing.T, db *sql.DB, label string) map[string]string {
 	t.Helper()
 	rows, err := db.Query("PRAGMA table_info(processed_files)")
