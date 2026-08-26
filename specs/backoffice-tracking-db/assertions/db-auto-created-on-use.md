@@ -3,7 +3,7 @@ id: db-auto-created-on-use
 parent: backoffice-tracking-db
 created: 2026-08-26T00:00:00Z
 priority: 1
-status: not_started
+status: done
 depends-on: tracking-db-exists
 ---
 

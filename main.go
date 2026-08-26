@@ -147,6 +147,13 @@ Options:
 
 	// Backoffice: process unformatted files one at a time, then exit
 	if *mode == "backoffice" {
+		tdb, err := OpenTrackingDB(projectRoot)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error opening tracking database: %s\n", err)
+			os.Exit(1)
+		}
+		tdb.Close()
+
 		unprocessed, err := unprocessedRawFiles()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error scanning files: %s\n", err)
